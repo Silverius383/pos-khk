@@ -2,7 +2,6 @@
 import { getIronSession } from "iron-session";
 import { sessionOptions, SessionData } from "./session";
 import { cookies } from "next/headers";
-import { NextRequest } from "next/server";
 
 // Cek password
 export async function checkAdminPassword(password: string): Promise<boolean> {
@@ -17,9 +16,9 @@ export async function getSession() {
 }
 
 // Untuk API Route Handlers
-export async function requireAuth(request: NextRequest): Promise<boolean> {
+export async function requireAuth(): Promise<boolean> {
   try {
-    const session = await getIronSession<SessionData>(request.cookies, sessionOptions);
+    const session = await getIronSession<SessionData>(cookies(), sessionOptions);
     return session.isLoggedIn === true;
   } catch {
     return false;
