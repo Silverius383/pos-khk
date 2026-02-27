@@ -18,7 +18,7 @@ export async function getSession() {
 // Untuk API Route Handlers
 export async function requireAuth(): Promise<boolean> {
   try {
-    const session = await getIronSession<SessionData>(cookies(), sessionOptions);
+    const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
     return session.isLoggedIn === true;
   } catch {
     return false;
