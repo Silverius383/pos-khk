@@ -1,0 +1,68 @@
+// prisma/schema.prisma
+// ============================================================
+// Schema database untuk POS Toko Frozen Food
+// Jalankan: npx prisma db push  atau  npx prisma migrate dev
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Product {
+  id           String    @id @default(uuid())
+  name         String
+  category     String    @default("")
+  buy_price    Int
+  sell_price   Int
+  stock        Int       @default(0)
+  min_stock    Int       @default(5)
+  expired_date DateTime?
+  created_at   DateTime  @default(now())
+  updated_at   DateTime  @updatedAt
+
+  transaction_items TransactionItem[]
+
+  @@map("products")
+}
+
+model Transaction {
+  id           String   @id @default(uuid())
+  total_amount Int
+  total_profit Int
+  created_at   DateTime @default(now())
+
+  items TransactionItem[]
+
+  @@map("transactions")
+}
+
+model TransactionItem {
+  id             String @id @default(uuid())
+  transaction_id String
+  product_id     String
+  product_name   String // snapshot nama produk saat transaksi
+  quantity       Int
+  sell_price     Int    // snapshot harga saat transaksi
+  buy_price      Int    // snapshot harga saat transaksi
+  profit         Int    // (sell_price - buy_price) * quantity
+
+  transaction Transaction @relation(fields: [transaction_id], references: [id], onDelete: Cascade)
+  product     Product     @relation(fields: [product_id], references: [id])
+
+  @@map("transaction_items")
+}
+
+model Expense {
+  id          String   @id @default(uuid())
+  name        String
+  amount      Int
+  category    String   @default("Operasional")
+  created_at  DateTime @default(now())
+
+  @@map("expenses")
+}
