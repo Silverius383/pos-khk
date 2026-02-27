@@ -9,7 +9,7 @@ import { formatDateShort, isExpired, isNearExpiry } from "@/utils/date";
 import Modal from "@/components/ui/Modal";
 import {
   PlusIcon, EditIcon, TrashIcon, CheckIcon,
-  SearchIcon, WarningIcon,
+  SearchIcon,
 } from "@/components/ui/Icons";
 
 const EMPTY_FORM: ProductFormData = {
@@ -47,7 +47,7 @@ export default function ProductsClient({ initialProducts }: ProductsClientProps)
     const numericValue = parseInt(rawValue) || 0;
     
     // Update form state
-    f(field)({ target: { value: numericValue } });
+    setForm((prev) => ({ ...prev, [field]: numericValue }));
     
     // Update display
     const formatted = rawValue ? formatRupiah(numericValue).replace('Rp ', '') : "";
@@ -330,7 +330,7 @@ export default function ProductsClient({ initialProducts }: ProductsClientProps)
               <select
                 className="form-input"
                 value={form.category}
-                onChange={f("category")}
+                onChange={fSelect("category")}
               >
                 <option value="" disabled>Pilih kategori...</option>
                 <option value="Nugget">Nugget</option>
