@@ -14,8 +14,9 @@ export async function proxy(request: NextRequest) {
   }
 
   // Cek session
+  const response = NextResponse.next();
   try {
-    const session = await getIronSession<SessionData>(request.cookies, sessionOptions);
+    const session = await getIronSession<SessionData>(request, response, sessionOptions);
 
     if (!session.isLoggedIn) {
       if (pathname.startsWith("/api/")) {
@@ -30,7 +31,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  return NextResponse.next();
+  return response; // ← return response instead of NextResponse.next()
 }
 
 export const config = {
