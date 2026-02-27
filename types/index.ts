@@ -1,5 +1,4 @@
 // types/index.ts
-// Definisi tipe data seluruh aplikasi
 
 // ─── Product ──────────────────────────────────────────────────────────────────
 export interface Product {
@@ -25,6 +24,14 @@ export interface ProductFormData {
   expired_date: string;
 }
 
+// ─── Discount ─────────────────────────────────────────────────────────────────
+export type DiscountType = "none" | "percent" | "nominal";
+
+export interface DiscountInfo {
+  type: DiscountType;
+  value: number; // angka diskon: % atau Rp
+}
+
 // ─── Transaction ─────────────────────────────────────────────────────────────
 export interface TransactionItem {
   id: string;
@@ -32,14 +39,20 @@ export interface TransactionItem {
   product_id: string;
   product_name: string;
   quantity: number;
-  sell_price: number;
+  sell_price: number;      // harga normal
   buy_price: number;
+  discount_type: DiscountType;
+  discount_value: number;  // angka diskon (% atau Rp)
+  discount_amount: number; // nilai diskon dalam Rp
+  final_price: number;     // harga setelah diskon per unit
+  subtotal: number;        // final_price * qty
   profit: number;
 }
 
 export interface Transaction {
   id: string;
-  total_amount: number;
+  total_amount: number;    // total setelah diskon
+  total_discount: number;  // total nilai diskon
   total_profit: number;
   created_at: string;
   items: TransactionItem[];
@@ -64,33 +77,14 @@ export interface ExpenseFormData {
 export interface CartItem {
   product_id: string;
   product_name: string;
-  sell_price: number;
+  sell_price: number;      // harga normal
   buy_price: number;
   quantity: number;
   max_qty: number;
-}
-
-// ─── Dashboard Stats ─────────────────────────────────────────────────────────
-export interface DashboardStats {
-  today_sales: number;
-  today_profit: number;
-  today_tx_count: number;
-  month_sales: number;
-  month_profit: number;
-  month_tx_count: number;
-  low_stock_products: Product[];
-  recent_transactions: Transaction[];
-}
-
-// ─── Report ──────────────────────────────────────────────────────────────────
-export interface ReportData {
-  total_sales: number;
-  gross_profit: number;
-  total_expenses: number;
-  net_profit: number;
-  tx_count: number;
-  top_products: { name: string; qty: number; revenue: number }[];
-  transactions: Transaction[];
+  discount_type: DiscountType;
+  discount_value: number;  // angka diskon (% atau Rp)
+  discount_amount: number; // nilai diskon per unit dalam Rp
+  final_price: number;     // harga setelah diskon per unit
 }
 
 // ─── API Response ─────────────────────────────────────────────────────────────

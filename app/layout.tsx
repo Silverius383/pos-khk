@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "POS Toko Frozen Food",
-  description: "Point of Sales untuk Toko Frozen Food Rumahan",
+  title: "POS KHK Frozen Food",
+  description: "Point of Sales KHK Frozen Food",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

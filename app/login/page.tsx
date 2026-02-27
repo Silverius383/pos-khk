@@ -54,7 +54,7 @@ export default function LoginPage() {
           </div>
           <div>
             <div style={{ fontSize: "18px", fontWeight: 800, lineHeight: 1.2 }}>
-              Toko Frozen Food
+              KHK Frozen Food
             </div>
             <div style={{ color: "var(--text2)", fontSize: "12px" }}>
               Point of Sales System

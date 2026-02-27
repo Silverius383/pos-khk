@@ -1,8 +1,4 @@
 // prisma/schema.prisma
-// ============================================================
-// Schema database untuk POS Toko Frozen Food
-// Jalankan: npx prisma db push  atau  npx prisma migrate dev
-// ============================================================
 
 generator client {
   provider = "prisma-client-js"
@@ -31,10 +27,11 @@ model Product {
 }
 
 model Transaction {
-  id           String   @id @default(uuid())
-  total_amount Int
-  total_profit Int
-  created_at   DateTime @default(now())
+  id             String   @id @default(uuid())
+  total_amount   Int      // total setelah semua diskon
+  total_discount Int      @default(0) // total nilai diskon (Rp)
+  total_profit   Int      // profit setelah diskon
+  created_at     DateTime @default(now())
 
   items TransactionItem[]
 
@@ -45,11 +42,16 @@ model TransactionItem {
   id             String @id @default(uuid())
   transaction_id String
   product_id     String
-  product_name   String // snapshot nama produk saat transaksi
+  product_name   String  // snapshot
   quantity       Int
-  sell_price     Int    // snapshot harga saat transaksi
-  buy_price      Int    // snapshot harga saat transaksi
-  profit         Int    // (sell_price - buy_price) * quantity
+  sell_price     Int     // snapshot harga normal
+  buy_price      Int     // snapshot harga beli
+  discount_type  String  @default("none")  // "none" | "percent" | "nominal"
+  discount_value Int     @default(0)       // angka diskon (% atau Rp)
+  discount_amount Int    @default(0)       // nilai diskon dalam Rp (hasil kalkulasi)
+  final_price    Int     // harga jual setelah diskon per unit
+  subtotal       Int     // final_price * quantity
+  profit         Int     // (final_price - buy_price) * quantity
 
   transaction Transaction @relation(fields: [transaction_id], references: [id], onDelete: Cascade)
   product     Product     @relation(fields: [product_id], references: [id])
@@ -58,11 +60,11 @@ model TransactionItem {
 }
 
 model Expense {
-  id          String   @id @default(uuid())
-  name        String
-  amount      Int
-  category    String   @default("Operasional")
-  created_at  DateTime @default(now())
+  id         String   @id @default(uuid())
+  name       String
+  amount     Int
+  category   String   @default("Operasional")
+  created_at DateTime @default(now())
 
   @@map("expenses")
 }

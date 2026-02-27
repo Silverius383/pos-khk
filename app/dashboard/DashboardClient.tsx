@@ -3,7 +3,7 @@
 
 import { Product, Transaction } from "@/types";
 import { formatRupiah } from "@/utils/currency";
-import { formatDateTime, formatDateShort, isExpired, isNearExpiry } from "@/utils/date";
+import { formatDateTime, isExpired } from "@/utils/date";
 import { WarningIcon } from "@/components/ui/Icons";
 
 interface DashboardClientProps {
@@ -19,18 +19,13 @@ interface DashboardClientProps {
   recentTransactions: Transaction[];
 }
 
-export default function DashboardClient({
-  stats,
-  lowStockProducts,
-  recentTransactions,
-}: DashboardClientProps) {
+export default function DashboardClient({ stats, lowStockProducts, recentTransactions }: DashboardClientProps) {
   const expiredProds = lowStockProducts.filter((p) => isExpired(p.expired_date));
-  const nearExpiry = lowStockProducts.filter((p) => isNearExpiry(p.expired_date));
 
   return (
     <div>
       {/* Alerts */}
-      {(expiredProds.length > 0 || nearExpiry.length > 0 || lowStockProducts.length > 0) && (
+      {(expiredProds.length > 0 || lowStockProducts.length > 0) && (
         <div style={{ marginBottom: "20px", display: "flex", flexDirection: "column", gap: "8px" }}>
           {expiredProds.length > 0 && (
             <div className="alert alert-danger">
@@ -44,16 +39,10 @@ export default function DashboardClient({
               <strong>{lowStockProducts.length} produk hampir habis stok.</strong>&nbsp;Segera restock.
             </div>
           )}
-          {nearExpiry.length > 0 && (
-            <div className="alert alert-warning">
-              <WarningIcon />
-              <strong>{nearExpiry.length} produk mendekati expired (7 hari).</strong>
-            </div>
-          )}
         </div>
       )}
 
-      {/* Stats Grid */}
+      {/* Stats */}
       <div className="stats-grid">
         <div className="stat-card blue">
           <div className="stat-label">Penjualan Hari Ini</div>
@@ -77,43 +66,28 @@ export default function DashboardClient({
         </div>
       </div>
 
-      {/* Bottom grid */}
       <div className="grid-2">
         {/* Low Stock */}
         <div className="card">
-          <div className="card-header">
-            <div className="card-title">⚠️ Stok Hampir Habis</div>
-          </div>
+          <div className="card-header"><div className="card-title">⚠️ Stok Hampir Habis</div></div>
           <div style={{ padding: 0 }}>
             {lowStockProducts.length === 0 ? (
-              <div style={{ padding: "24px", textAlign: "center", color: "var(--text3)" }}>
-                Semua stok aman ✅
-              </div>
+              <div style={{ padding: "24px", textAlign: "center", color: "var(--text3)" }}>Semua stok aman ✅</div>
             ) : (
               <div className="table-wrap">
                 <table>
-                  <thead>
-                    <tr>
-                      <th>Produk</th>
-                      <th>Stok</th>
-                      <th>Min</th>
-                    </tr>
-                  </thead>
+                  <thead><tr><th>Produk</th><th>Stok</th><th>Min</th></tr></thead>
                   <tbody>
                     {lowStockProducts.map((p) => (
                       <tr key={p.id}>
                         <td style={{ fontWeight: 600 }}>
                           {p.name}
                           {isExpired(p.expired_date) && (
-                            <span className="badge badge-danger" style={{ marginLeft: "8px", fontSize: "10px" }}>
-                              Expired
-                            </span>
+                            <span className="badge badge-danger" style={{ marginLeft: "8px", fontSize: "10px" }}>Expired</span>
                           )}
                         </td>
                         <td>
-                          <span className={`badge ${p.stock === 0 ? "badge-danger" : "badge-warning"}`}>
-                            {p.stock}
-                          </span>
+                          <span className={`badge ${p.stock === 0 ? "badge-danger" : "badge-warning"}`}>{p.stock}</span>
                         </td>
                         <td className="text-muted">{p.min_stock}</td>
                       </tr>
@@ -127,29 +101,20 @@ export default function DashboardClient({
 
         {/* Recent Transactions */}
         <div className="card">
-          <div className="card-header">
-            <div className="card-title">🧾 Transaksi Terakhir</div>
-          </div>
+          <div className="card-header"><div className="card-title">🧾 Transaksi Terakhir</div></div>
           <div style={{ padding: 0 }}>
             {recentTransactions.length === 0 ? (
-              <div style={{ padding: "24px", textAlign: "center", color: "var(--text3)" }}>
-                Belum ada transaksi
-              </div>
+              <div style={{ padding: "24px", textAlign: "center", color: "var(--text3)" }}>Belum ada transaksi</div>
             ) : (
               <div className="table-wrap">
                 <table>
-                  <thead>
-                    <tr>
-                      <th>Waktu</th>
-                      <th>Total</th>
-                      <th>Profit</th>
-                    </tr>
-                  </thead>
+                  <thead><tr><th>Waktu</th><th>Diskon</th><th>Total</th><th>Profit</th></tr></thead>
                   <tbody>
                     {recentTransactions.map((t) => (
                       <tr key={t.id}>
-                        <td className="text-muted" style={{ fontSize: "12px" }}>
-                          {formatDateTime(t.created_at)}
+                        <td className="text-muted" style={{ fontSize: "12px" }}>{formatDateTime(t.created_at)}</td>
+                        <td className="td-mono" style={{ color: t.total_discount > 0 ? "var(--warning)" : "var(--text3)", fontSize: "12px" }}>
+                          {t.total_discount > 0 ? `−${formatRupiah(t.total_discount)}` : "—"}
                         </td>
                         <td className="td-mono">{formatRupiah(t.total_amount)}</td>
                         <td className="td-mono text-success">{formatRupiah(t.total_profit)}</td>

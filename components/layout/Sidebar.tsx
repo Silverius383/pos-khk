@@ -53,8 +53,8 @@ export default function Sidebar({ isOpen, onClose, lowStockCount = 0 }: SidebarP
             <SnowflakeIcon size={26} />
           </div>
           <div>
-            <div className="sidebar-logo-text">Toko Frozen</div>
-            <div className="sidebar-logo-sub">Food POS System</div>
+            <div className="sidebar-logo-text">KHK Frozen Food</div>
+            <div className="sidebar-logo-sub">POS System</div>
           </div>
         </div>
 
