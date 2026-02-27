@@ -22,25 +22,31 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 
 // PUT /api/products/:id - Update produk
 export async function PUT(
-  request: NextRequest, 
-  { params }: { params: Promise<{ id: string }> }  // ← Add Promise<> wrapper
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
   if (!(await requireAuth(request))) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { success: false, error: "Unauthorized" },
+      { status: 401 }
+    );
   }
 
   try {
-    const { id } = await params;  // ← Await params here
-    
+    const { id } = await context.params;
+
     const body = await request.json();
     const { name, category, buy_price, sell_price, stock, min_stock, expired_date } = body;
 
     if (!name || !buy_price || !sell_price) {
-      return NextResponse.json({ success: false, error: "Nama, harga beli, dan harga jual wajib diisi" }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: "Nama, harga beli, dan harga jual wajib diisi" },
+        { status: 400 }
+      );
     }
 
     const product = await prisma.product.update({
-      where: { id },  // ← Use the destructured id
+      where: { id },
       data: {
         name,
         category: category || "",
@@ -55,26 +61,39 @@ export async function PUT(
     return NextResponse.json({ success: true, data: product });
   } catch (error) {
     console.error("PUT /api/products error:", error);
-    return NextResponse.json({ success: false, error: "Gagal mengupdate produk" }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: "Gagal mengupdate produk" },
+      { status: 500 }
+    );
   }
 }
 
 // DELETE /api/products/:id
 export async function DELETE(
-  request: NextRequest, 
-  { params }: { params: Promise<{ id: string }> }  // ← Add Promise<> wrapper
+  request: NextRequest,
+  context: { params: Promise<{ id: string }> }
 ) {
   if (!(await requireAuth(request))) {
-    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json(
+      { success: false, error: "Unauthorized" },
+      { status: 401 }
+    );
   }
 
   try {
-    const { id } = await params;  // ← Await params here
-    
-    await prisma.product.delete({ where: { id } });  // ← Use id instead of params.id
+    const { id } = await context.params;
+
+    await prisma.product.delete({ where: { id } });
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE /api/products error:", error);
-    return NextResponse.json({ success: false, error: "Gagal menghapus produk. Mungkin masih ada transaksi terkait." }, { status: 500 });
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Gagal menghapus produk. Mungkin masih ada transaksi terkait.",
+      },
+      { status: 500 }
+    );
   }
 }
