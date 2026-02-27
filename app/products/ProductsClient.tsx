@@ -171,6 +171,15 @@ export default function ProductsClient({ initialProducts }: ProductsClientProps)
     }
   };
 
+  const fSelect =
+  (key: keyof ProductFormData) =>
+  (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setForm((prev) => ({
+      ...prev,
+      [key]: e.target.value,
+    }));
+  };
+
   const f = (key: keyof ProductFormData) => (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = ["buy_price", "sell_price", "stock", "min_stock"].includes(key)
       ? Number(e.target.value)
