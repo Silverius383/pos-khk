@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
-  if (!(await requireAuth(request))) {
+  if (!(await requireAuth())) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 

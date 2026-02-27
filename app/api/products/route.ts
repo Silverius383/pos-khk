@@ -5,7 +5,7 @@ import { requireAuth } from "@/lib/auth";
 
 // GET /api/products - Ambil semua produk
 export async function GET(request: NextRequest) {
-  if (!(await requireAuth(request))) {
+  if (!(await requireAuth())) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 
 // POST /api/products - Tambah produk baru
 export async function POST(request: NextRequest) {
-  if (!(await requireAuth(request))) {
+  if (!(await requireAuth())) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 

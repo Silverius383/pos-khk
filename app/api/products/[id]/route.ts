@@ -7,7 +7,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!(await requireAuth(request))) {
+  if (!(await requireAuth())) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 
@@ -27,7 +27,7 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!(await requireAuth(request))) {
+  if (!(await requireAuth())) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 
@@ -64,7 +64,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!(await requireAuth(request))) {
+  if (!(await requireAuth())) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 
