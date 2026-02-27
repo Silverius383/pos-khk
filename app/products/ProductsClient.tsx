@@ -1,7 +1,7 @@
 // app/products/ProductsClient.tsx
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Product, ProductFormData } from "@/types";
 import { formatRupiah, calculateMarginPercent } from "@/utils/currency";
@@ -34,6 +34,29 @@ export default function ProductsClient({ initialProducts }: ProductsClientProps)
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [displayBuyPrice, setDisplayBuyPrice] = useState("");
+  const [displaySellPrice, setDisplaySellPrice] = useState("");
+
+  useEffect(() => {
+    setDisplayBuyPrice(form.buy_price ? formatRupiah(form.buy_price).replace('Rp ', '') : "");
+    setDisplaySellPrice(form.sell_price ? formatRupiah(form.sell_price).replace('Rp ', '') : "");
+  }, [form.buy_price, form.sell_price]);
+
+  const handlePriceChange = (field: 'buy_price' | 'sell_price', value: string) => {
+    const rawValue = value.replace(/[^0-9]/g, '');
+    const numericValue = parseInt(rawValue) || 0;
+    
+    // Update form state
+    f(field)({ target: { value: numericValue } });
+    
+    // Update display
+    const formatted = rawValue ? formatRupiah(numericValue).replace('Rp ', '') : "";
+    if (field === 'buy_price') {
+      setDisplayBuyPrice(formatted);
+    } else {
+      setDisplaySellPrice(formatted);
+    }
+  };
 
   const categories = useMemo(
     () => ["Semua", ...Array.from(new Set(products.map((p) => p.category).filter(Boolean)))],
@@ -304,12 +327,19 @@ export default function ProductsClient({ initialProducts }: ProductsClientProps)
           <div className="form-grid">
             <div className="form-group">
               <label className="form-label">Kategori</label>
-              <input
+              <select
                 className="form-input"
                 value={form.category}
                 onChange={f("category")}
-                placeholder="Contoh: Nugget, Sosis, Bakso"
-              />
+              >
+                <option value="" disabled>Pilih kategori...</option>
+                <option value="Nugget">Nugget</option>
+                <option value="Sosis">Sosis</option>
+                <option value="Bakso">Bakso</option>
+                <option value="Dimsum">Dimsum</option>
+                <option value="Kentang">Kentang</option>
+                <option value="Daging">Daging</option>
+              </select>
             </div>
             <div className="form-group">
               <label className="form-label">Stok Minimum (Alert)</label>
@@ -324,25 +354,38 @@ export default function ProductsClient({ initialProducts }: ProductsClientProps)
 
           <div className="form-grid">
             <div className="form-group">
-              <label className="form-label">Harga Beli (Rp) *</label>
-              <input
-                className="form-input"
-                type="number"
-                value={form.buy_price || ""}
-                onChange={f("buy_price")}
-                placeholder="0"
-              />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Harga Jual (Rp) *</label>
-              <input
-                className="form-input"
-                type="number"
-                value={form.sell_price || ""}
-                onChange={f("sell_price")}
-                placeholder="0"
-              />
-            </div>
+  <label className="form-label">Harga Beli (Rp) *</label>
+  <div className="relative">
+    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">
+      Rp
+    </span>
+    <input
+      className="form-input pl-10"
+      type="text"
+      inputMode="numeric"
+      value={displayBuyPrice}
+      onChange={(e) => handlePriceChange('buy_price', e.target.value)}
+      placeholder="0"
+    />
+  </div>
+</div>
+
+<div className="form-group">
+  <label className="form-label">Harga Jual (Rp) *</label>
+  <div className="relative">
+    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">
+      Rp
+    </span>
+    <input
+      className="form-input pl-10"
+      type="text"
+      inputMode="numeric"
+      value={displaySellPrice}
+      onChange={(e) => handlePriceChange('sell_price', e.target.value)}
+      placeholder="0"
+    />
+  </div>
+</div>
           </div>
 
           <div className="form-grid">
