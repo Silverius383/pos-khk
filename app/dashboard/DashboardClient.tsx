@@ -154,9 +154,9 @@ export default function DashboardClient({ stats, lowStockProducts, recentTransac
                       <tr key={p.id}>
                         <td style={{ fontWeight: 600 }}>
                           {p.name}
-                          {/* {isExpired(p.expired_date) && (
+                          {isExpired(p.expired_date) && (
                             <span className="badge badge-danger" style={{ marginLeft: "8px", fontSize: "10px" }}>Expired</span>
-                          )} */}
+                          )}
                         </td>
                         <td>
                           <span className={`badge ${p.stock === 0 ? "badge-danger" : "badge-warning"}`}>{p.stock}</span>
@@ -195,7 +195,7 @@ export default function DashboardClient({ stats, lowStockProducts, recentTransac
                   <tbody>
                     {recentTransactions.map((t) => (
                       <tr key={t.id}>
-                        <td className="text-muted" style={{ fontSize: "12px" }}>{t.created_at}</td>
+                        <td className="text-muted" style={{ fontSize: "12px" }}>{formatDateTime(t.created_at)}</td>
                         <td className="td-mono" style={{ color: t.total_discount > 0 ? "var(--warning)" : "var(--text3)", fontSize: "12px" }}>
                           {t.total_discount > 0 ? `−${formatRupiah(t.total_discount)}` : "—"}
                         </td>
