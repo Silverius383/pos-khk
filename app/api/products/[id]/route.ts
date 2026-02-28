@@ -1,8 +1,17 @@
 // app/api/products/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { revalidatePath } from "next/cache"; // 👈 added
+import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
+
+// Revalidate every page that shows the lowStockCount badge in the sidebar
+const revalidateAll = () => {
+  revalidatePath("/dashboard");
+  revalidatePath("/products");
+  revalidatePath("/transactions");
+  revalidatePath("/expenses");
+  revalidatePath("/reports");
+};
 
 export async function GET(
   request: NextRequest,
@@ -61,9 +70,7 @@ export async function PUT(
       },
     });
 
-    // 👇 revalidate so sidebar badge recalculates
-    revalidatePath("/products");
-    revalidatePath("/dashboard");
+    revalidateAll(); // 👈 bust cache on every page
 
     return NextResponse.json({ success: true, data: product });
   } catch (error) {
@@ -92,9 +99,7 @@ export async function DELETE(
       data: { deleted_at: new Date() },
     });
 
-    // 👇 revalidate so sidebar badge clears immediately
-    revalidatePath("/products");
-    revalidatePath("/dashboard");
+    revalidateAll(); // 👈 bust cache on every page
 
     return NextResponse.json({ success: true });
   } catch (error) {
