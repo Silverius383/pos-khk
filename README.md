@@ -89,4 +89,4 @@ pos-frozen-food/
 1. Push ke GitHub
 2. Import di vercel.com
 3. Tambah Environment Variables: `DATABASE_URL`, `SESSION_SECRET`, `ADMIN_PASSWORD`
-4. Deploy → selesai!
+4. Deploy → selesai! 
