@@ -13,20 +13,22 @@ export async function GET(request: NextRequest) {
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-    // Transaksi hari ini
     const [todayTx, monthTx, todayExp, monthExp, lowStockProducts, recentTransactions] =
       await Promise.all([
         prisma.transaction.findMany({ where: { created_at: { gte: todayStart } } }),
         prisma.transaction.findMany({ where: { created_at: { gte: monthStart } } }),
         prisma.expense.findMany({ where: { created_at: { gte: todayStart } } }),
         prisma.expense.findMany({ where: { created_at: { gte: monthStart } } }),
+        // 👇 added deleted_at: null to both the Prisma query and the raw SQL fallback
         prisma.product.findMany({
-          where: { stock: { lte: prisma.product.fields.min_stock } },
+          where: {
+            deleted_at: null,
+            stock: { lte: prisma.product.fields.min_stock },
+          },
           orderBy: { stock: "asc" },
           take: 10,
         }).catch(() =>
-          // fallback: raw query jika prisma.product.fields tidak tersedia
-          prisma.$queryRaw`SELECT * FROM products WHERE stock <= min_stock ORDER BY stock ASC LIMIT 10`
+          prisma.$queryRaw`SELECT * FROM products WHERE stock <= min_stock AND deleted_at IS NULL ORDER BY stock ASC LIMIT 10`
         ),
         prisma.transaction.findMany({
           include: { items: true },

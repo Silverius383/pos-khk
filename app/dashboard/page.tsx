@@ -25,7 +25,10 @@ export default async function DashboardPage() {
           orderBy: { created_at: "desc" },
           take: 8,
         }),
-        prisma.product.findMany({ orderBy: { stock: "asc" } }),
+        prisma.product.findMany({
+          where: { deleted_at: null }, // 👈 exclude soft-deleted
+          orderBy: { stock: "asc" },
+        }),
       ]);
 
     const lowStockProducts = allProducts.filter((p) => p.stock <= p.min_stock);
@@ -53,7 +56,6 @@ export default async function DashboardPage() {
       </AppLayout>
     );
   } catch (error) {
-    // Database belum terhubung
     console.error("Dashboard DB error:", error);
     return (
       <AppLayout title="Dashboard">

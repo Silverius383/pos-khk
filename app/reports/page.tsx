@@ -14,7 +14,10 @@ export default async function ReportsPage() {
   const to = todayISO();
 
   try {
-    const allProducts = await prisma.product.findMany({ select: { stock: true, min_stock: true } });
+    const allProducts = await prisma.product.findMany({
+      where: { deleted_at: null }, // 👈 exclude soft-deleted
+      select: { stock: true, min_stock: true },
+    });
     const lowStockCount = allProducts.filter((p) => p.stock <= p.min_stock).length;
     const dateFilter = {
       gte: new Date(from + "T00:00:00.000Z"),

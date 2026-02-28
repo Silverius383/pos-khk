@@ -10,7 +10,10 @@ export default async function TransactionsPage() {
   if (!session.isLoggedIn) redirect("/login");
 
   try {
-    const products = await prisma.product.findMany({ orderBy: { name: "asc" } });
+    const products = await prisma.product.findMany({
+      where: { deleted_at: null }, // 👈 exclude soft-deleted
+      orderBy: { name: "asc" },
+    });
     const lowStockCount = products.filter((p) => p.stock <= p.min_stock).length;
 
     return (
