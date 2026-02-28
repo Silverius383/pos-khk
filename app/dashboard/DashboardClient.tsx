@@ -1,10 +1,11 @@
 // app/dashboard/DashboardClient.tsx
 "use client";
 
+import { useState, useMemo } from "react";
 import { Product, Transaction } from "@/types";
 import { formatRupiah } from "@/utils/currency";
 import { formatDateTime, isExpired } from "@/utils/date";
-import { WarningIcon } from "@/components/ui/Icons";
+import { WarningIcon, SearchIcon } from "@/components/ui/Icons";
 
 interface DashboardClientProps {
   stats: {
@@ -22,9 +23,28 @@ interface DashboardClientProps {
 export default function DashboardClient({ stats, lowStockProducts, recentTransactions }: DashboardClientProps) {
   const expiredProds = lowStockProducts.filter((p) => isExpired(p.expired_date));
 
+  const [stockSearch, setStockSearch] = useState("");
+  const [stockCat, setStockCat] = useState("Semua");
+
+  const stockCategories = useMemo(
+    () => ["Semua", ...Array.from(new Set(lowStockProducts.map((p) => p.category).filter(Boolean)))],
+    [lowStockProducts]
+  );
+
+  const filteredLowStock = useMemo(
+    () =>
+      lowStockProducts.filter((p) => {
+        const matchSearch =
+          p.name.toLowerCase().includes(stockSearch.toLowerCase()) ||
+          (p.category || "").toLowerCase().includes(stockSearch.toLowerCase());
+        const matchCat = stockCat === "Semua" || p.category === stockCat;
+        return matchSearch && matchCat;
+      }),
+    [lowStockProducts, stockSearch, stockCat]
+  );
+
   return (
     <div>
-      {/* Alerts */}
       {(expiredProds.length > 0 || lowStockProducts.length > 0) && (
         <div style={{ marginBottom: "20px", display: "flex", flexDirection: "column", gap: "8px" }}>
           {expiredProds.length > 0 && (
@@ -42,7 +62,6 @@ export default function DashboardClient({ stats, lowStockProducts, recentTransac
         </div>
       )}
 
-      {/* Stats */}
       <div className="stats-grid">
         <div className="stat-card blue">
           <div className="stat-label">Penjualan Hari Ini</div>
@@ -67,7 +86,6 @@ export default function DashboardClient({ stats, lowStockProducts, recentTransac
       </div>
 
       <div className="grid-2">
-        {/* Low Stock */}
         <div className="card">
           <div className="card-header">
             <div className="card-title">⚠️ Stok Hampir Habis</div>
@@ -75,10 +93,52 @@ export default function DashboardClient({ stats, lowStockProducts, recentTransac
               <span className="badge badge-warning">{lowStockProducts.length} produk</span>
             )}
           </div>
-          {/* ✅ dashboard-card-scroll: max-height 280px with scroll */}
+
+          {lowStockProducts.length > 0 && (
+            <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: "8px" }}>
+              <div className="search-wrap" style={{ marginBottom: 0 }}>
+                <span className="search-icon"><SearchIcon /></span>
+                <input
+                  className="form-input"
+                  style={{ fontSize: "13px", padding: "7px 10px 7px 36px" }}
+                  placeholder="Cari produk..."
+                  value={stockSearch}
+                  onChange={(e) => setStockSearch(e.target.value)}
+                />
+              </div>
+              {stockCategories.length > 2 && (
+                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                  {stockCategories.map((c) => (
+                    <button
+                      key={c}
+                      onClick={() => setStockCat(c)}
+                      style={{
+                        padding: "3px 10px",
+                        borderRadius: "99px",
+                        fontSize: "11px",
+                        fontWeight: 600,
+                        border: "1px solid",
+                        cursor: "pointer",
+                        fontFamily: "inherit",
+                        transition: "all 0.15s",
+                        background: stockCat === c ? "var(--warning-light)" : "var(--surface2)",
+                        borderColor: stockCat === c ? "#FCD34D" : "var(--border)",
+                        color: stockCat === c ? "var(--warning)" : "var(--text2)",
+                      }}
+                    >
+                      {c}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="dashboard-card-scroll">
             {lowStockProducts.length === 0 ? (
               <div style={{ padding: "24px", textAlign: "center", color: "var(--text3)" }}>Semua stok aman ✅</div>
+            ) : filteredLowStock.length === 0 ? (
+              <div style={{ padding: "24px", textAlign: "center", color: "var(--text3)" }}>Produk tidak ditemukan 🔍</div>
             ) : (
               <div className="table-wrap">
                 <table>
@@ -90,7 +150,7 @@ export default function DashboardClient({ stats, lowStockProducts, recentTransac
                     </tr>
                   </thead>
                   <tbody>
-                    {lowStockProducts.map((p) => (
+                    {filteredLowStock.map((p) => (
                       <tr key={p.id}>
                         <td style={{ fontWeight: 600 }}>
                           {p.name}
@@ -111,7 +171,6 @@ export default function DashboardClient({ stats, lowStockProducts, recentTransac
           </div>
         </div>
 
-        {/* Recent Transactions */}
         <div className="card">
           <div className="card-header">
             <div className="card-title">🧾 Transaksi Terakhir</div>
@@ -119,7 +178,6 @@ export default function DashboardClient({ stats, lowStockProducts, recentTransac
               <span className="badge badge-blue">{recentTransactions.length}</span>
             )}
           </div>
-          {/* ✅ dashboard-card-scroll: max-height 280px with scroll */}
           <div className="dashboard-card-scroll">
             {recentTransactions.length === 0 ? (
               <div style={{ padding: "24px", textAlign: "center", color: "var(--text3)" }}>Belum ada transaksi</div>
