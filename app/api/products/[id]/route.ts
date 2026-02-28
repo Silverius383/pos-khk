@@ -1,5 +1,6 @@
 // app/api/products/[id]/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache"; // 👈 added
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 
@@ -14,7 +15,7 @@ export async function GET(
   try {
     const { id } = await params;
     const product = await prisma.product.findFirst({
-      where: { id, deleted_at: null }, // 👈 exclude soft-deleted
+      where: { id, deleted_at: null },
     });
     if (!product) {
       return NextResponse.json({ success: false, error: "Produk tidak ditemukan" }, { status: 404 });
@@ -42,7 +43,6 @@ export async function PUT(
       return NextResponse.json({ success: false, error: "Nama, harga beli, dan harga jual wajib diisi" }, { status: 400 });
     }
 
-    // 👇 Prevent updating a soft-deleted product
     const existing = await prisma.product.findFirst({ where: { id, deleted_at: null } });
     if (!existing) {
       return NextResponse.json({ success: false, error: "Produk tidak ditemukan" }, { status: 404 });
@@ -61,6 +61,10 @@ export async function PUT(
       },
     });
 
+    // 👇 revalidate so sidebar badge recalculates
+    revalidatePath("/products");
+    revalidatePath("/dashboard");
+
     return NextResponse.json({ success: true, data: product });
   } catch (error) {
     console.error("PUT /api/products error:", error);
@@ -78,7 +82,6 @@ export async function DELETE(
 
   try {
     const { id } = await params;
-    // 👇 Soft delete: set deleted_at instead of removing the row 
     const product = await prisma.product.findFirst({ where: { id, deleted_at: null } });
     if (!product) {
       return NextResponse.json({ success: false, error: "Produk tidak ditemukan" }, { status: 404 });
@@ -88,6 +91,10 @@ export async function DELETE(
       where: { id },
       data: { deleted_at: new Date() },
     });
+
+    // 👇 revalidate so sidebar badge clears immediately
+    revalidatePath("/products");
+    revalidatePath("/dashboard");
 
     return NextResponse.json({ success: true });
   } catch (error) {
