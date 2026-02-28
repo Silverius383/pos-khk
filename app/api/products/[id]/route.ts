@@ -78,8 +78,7 @@ export async function DELETE(
 
   try {
     const { id } = await params;
-
-    // 👇 Soft delete: set deleted_at instead of removing the row
+    // 👇 Soft delete: set deleted_at instead of removing the row 
     const product = await prisma.product.findFirst({ where: { id, deleted_at: null } });
     if (!product) {
       return NextResponse.json({ success: false, error: "Produk tidak ditemukan" }, { status: 404 });
