@@ -1,79 +1,54 @@
 // public/sw.js
-// Manual Service Worker — compatible with Next.js 16 Turbopack
-// No build tools needed, this file is served as-is from /public
+const CACHE_NAME = "khk-pos-v2";
 
-const CACHE_NAME = "khk-pos-v1";
-
-// Static assets to cache on install
-const PRECACHE_ASSETS = [
-  "/",
+const PRECACHE_URLS = [
   "/dashboard",
   "/manifest.json",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
 ];
 
-// Install: pre-cache static assets
+// Install
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(PRECACHE_ASSETS).catch(() => {
-        // Silently fail — some pages may not be pre-cacheable
-      });
-    })
-  );
   self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) =>
+      Promise.allSettled(PRECACHE_URLS.map((url) => cache.add(url)))
+    )
+  );
 });
 
-// Activate: clean up old caches
+// Activate
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => key !== CACHE_NAME)
-          .map((key) => caches.delete(key))
-      )
-    )
+      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-// Fetch: network-first for API calls, cache-first for static assets
+// Fetch — network first, fallback to cache
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip non-GET and cross-origin requests
+  // Only handle GET from same origin
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
 
-  // API calls: always network-first, no cache
+  // API: always network only
   if (url.pathname.startsWith("/api/")) {
     event.respondWith(fetch(request));
     return;
   }
 
-  // Static assets (_next/static): cache-first
-  if (url.pathname.startsWith("/_next/static/")) {
-    event.respondWith(
-      caches.match(request).then((cached) => {
-        if (cached) return cached;
-        return fetch(request).then((response) => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-          return response;
-        });
-      })
-    );
-    return;
-  }
-
-  // Pages: network-first, fallback to cache
+  // Everything else: network first, cache fallback
   event.respondWith(
     fetch(request)
       .then((response) => {
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+        if (response.ok) {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+        }
         return response;
       })
       .catch(() => caches.match(request))
