@@ -1,4 +1,6 @@
 // app/dashboard/page.tsx
+"use client";
+
 export const dynamic = "force-dynamic";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
