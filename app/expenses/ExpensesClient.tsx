@@ -23,18 +23,26 @@ const EXPENSE_CATEGORIES = [
 
 export default function ExpensesClient({ initialExpenses }: ExpensesClientProps) {
   const router = useRouter();
-  const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
+  const [expenses, setExpenses]   = useState<Expense[]>(initialExpenses);
   const [filterMonth, setFilterMonth] = useState(currentMonth());
-  const [modal, setModal] = useState(false);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: "", amount: "", category: "Operasional" });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
+  const [modal, setModal]         = useState(false);
+  const [deleteId, setDeleteId]   = useState<string | null>(null);
+  const [form, setForm]           = useState({ name: "", amount: 0, category: "Operasional" });
+  const [displayAmount, setDisplayAmount] = useState(""); // 👈 formatted display value
+  const [saving, setSaving]       = useState(false);
+  const [error, setError]         = useState("");
 
-  // Load expenses for selected month
+  // ── Rupiah input handler ──────────────────────────────────────────────
+  const handleAmountChange = (value: string) => {
+    const raw     = value.replace(/[^0-9]/g, "");          // strip non-digits
+    const numeric = parseInt(raw) || 0;
+    setForm((p) => ({ ...p, amount: numeric }));
+    setDisplayAmount(raw ? formatRupiah(numeric).replace("Rp ", "") : "");
+  };
+
   const loadExpenses = async (month: string) => {
     try {
-      const res = await fetch(`/api/expenses?month=${month}`);
+      const res  = await fetch(`/api/expenses?month=${month}`);
       const data = await res.json();
       if (data.success) setExpenses(data.data);
     } catch {
@@ -74,8 +82,8 @@ export default function ExpensesClient({ initialExpenses }: ExpensesClientProps)
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: form.name,
-          amount: parseInt(form.amount),
+          name:     form.name,
+          amount:   form.amount,
           category: form.category,
         }),
       });
@@ -88,7 +96,8 @@ export default function ExpensesClient({ initialExpenses }: ExpensesClientProps)
       }
 
       setExpenses((prev) => [data.data, ...prev]);
-      setForm({ name: "", amount: "", category: "Operasional" });
+      setForm({ name: "", amount: 0, category: "Operasional" });
+      setDisplayAmount("");
       setModal(false);
       router.refresh();
     } catch {
@@ -103,7 +112,7 @@ export default function ExpensesClient({ initialExpenses }: ExpensesClientProps)
     setSaving(true);
 
     try {
-      const res = await fetch(`/api/expenses/${deleteId}`, { method: "DELETE" });
+      const res  = await fetch(`/api/expenses/${deleteId}`, { method: "DELETE" });
       const data = await res.json();
 
       if (!data.success) {
@@ -121,6 +130,13 @@ export default function ExpensesClient({ initialExpenses }: ExpensesClientProps)
     }
   };
 
+  const openModal = () => {
+    setError("");
+    setForm({ name: "", amount: 0, category: "Operasional" });
+    setDisplayAmount("");
+    setModal(true);
+  };
+
   return (
     <div>
       {/* Header */}
@@ -128,7 +144,7 @@ export default function ExpensesClient({ initialExpenses }: ExpensesClientProps)
         <div className="section-title" style={{ margin: 0 }}>
           Pengeluaran & Biaya Operasional
         </div>
-        <button className="btn btn-primary" onClick={() => { setError(""); setModal(true); }}>
+        <button className="btn btn-primary" onClick={openModal}>
           <PlusIcon /> Tambah Pengeluaran
         </button>
       </div>
@@ -275,13 +291,31 @@ export default function ExpensesClient({ initialExpenses }: ExpensesClientProps)
           <div className="form-grid">
             <div className="form-group">
               <label className="form-label">Jumlah (Rp) *</label>
-              <input
-                className="form-input"
-                type="number"
-                value={form.amount}
-                onChange={(e) => setForm((p) => ({ ...p, amount: e.target.value }))}
-                placeholder="0"
-              />
+              {/* 👇 Rupiah formatted input */}
+              <div style={{ position: "relative" }}>
+                <span style={{
+                  position: "absolute", left: "12px", top: "50%",
+                  transform: "translateY(-50%)", color: "var(--text3)",
+                  fontWeight: 600, pointerEvents: "none", fontSize: "13px",
+                }}>
+                  Rp
+                </span>
+                <input
+                  className="form-input"
+                  style={{ paddingLeft: "36px" }}
+                  type="text"
+                  inputMode="numeric"
+                  value={displayAmount}
+                  onChange={(e) => handleAmountChange(e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+              {/* Live preview */}
+              {form.amount > 0 && (
+                <div style={{ marginTop: "4px", fontSize: "12px", color: "var(--text3)" }}>
+                  {formatRupiah(form.amount)}
+                </div>
+              )}
             </div>
             <div className="form-group">
               <label className="form-label">Kategori</label>
