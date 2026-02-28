@@ -69,14 +69,26 @@ export default function DashboardClient({ stats, lowStockProducts, recentTransac
       <div className="grid-2">
         {/* Low Stock */}
         <div className="card">
-          <div className="card-header"><div className="card-title">⚠️ Stok Hampir Habis</div></div>
-          <div style={{ padding: 0 }}>
+          <div className="card-header">
+            <div className="card-title">⚠️ Stok Hampir Habis</div>
+            {lowStockProducts.length > 0 && (
+              <span className="badge badge-warning">{lowStockProducts.length} produk</span>
+            )}
+          </div>
+          {/* ✅ dashboard-card-scroll: max-height 280px with scroll */}
+          <div className="dashboard-card-scroll">
             {lowStockProducts.length === 0 ? (
               <div style={{ padding: "24px", textAlign: "center", color: "var(--text3)" }}>Semua stok aman ✅</div>
             ) : (
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th>Produk</th><th>Stok</th><th>Min</th></tr></thead>
+                  <thead>
+                    <tr>
+                      <th>Produk</th>
+                      <th>Stok</th>
+                      <th>Min</th>
+                    </tr>
+                  </thead>
                   <tbody>
                     {lowStockProducts.map((p) => (
                       <tr key={p.id}>
@@ -101,14 +113,27 @@ export default function DashboardClient({ stats, lowStockProducts, recentTransac
 
         {/* Recent Transactions */}
         <div className="card">
-          <div className="card-header"><div className="card-title">🧾 Transaksi Terakhir</div></div>
-          <div style={{ padding: 0 }}>
+          <div className="card-header">
+            <div className="card-title">🧾 Transaksi Terakhir</div>
+            {recentTransactions.length > 0 && (
+              <span className="badge badge-blue">{recentTransactions.length}</span>
+            )}
+          </div>
+          {/* ✅ dashboard-card-scroll: max-height 280px with scroll */}
+          <div className="dashboard-card-scroll">
             {recentTransactions.length === 0 ? (
               <div style={{ padding: "24px", textAlign: "center", color: "var(--text3)" }}>Belum ada transaksi</div>
             ) : (
               <div className="table-wrap">
                 <table>
-                  <thead><tr><th>Waktu</th><th>Diskon</th><th>Total</th><th>Profit</th></tr></thead>
+                  <thead>
+                    <tr>
+                      <th>Waktu</th>
+                      <th>Diskon</th>
+                      <th>Total</th>
+                      <th>Profit</th>
+                    </tr>
+                  </thead>
                   <tbody>
                     {recentTransactions.map((t) => (
                       <tr key={t.id}>

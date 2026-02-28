@@ -2,7 +2,6 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
-
 import { useRouter } from "next/navigation";
 import { Product, ProductFormData } from "@/types";
 import { formatRupiah, calculateMarginPercent } from "@/utils/currency";
@@ -62,7 +61,7 @@ interface ProductsClientProps {
 
 type ModalType = "add" | "edit" | "delete" | null;
 
-// ── Searchable Category — inline expanding (no float/portal needed) ──────────
+// ── Searchable Category ──────────────────────────────────────────────────────
 function CategorySelect({
   value,
   onChange,
@@ -86,7 +85,6 @@ function CategorySelect({
 
   return (
     <div>
-      {/* Trigger button */}
       <div
         className="form-input"
         onClick={() => { setOpen((o) => !o); setSearch(""); }}
@@ -107,51 +105,48 @@ function CategorySelect({
           fontSize: "10px",
           color: "var(--text3)",
           transform: open ? "rotate(180deg)" : "rotate(0deg)",
-          transition: "transform 0.15s ease",
+          transition: "transform 0.15s",
+          display: "inline-block",
         }}>▼</span>
       </div>
 
-      {/* Inline expanding panel — no positioning, flows naturally in the form */}
       {open && (
         <div style={{
-          border:       "1.5px solid var(--primary)",
-          borderTop:    "none",
-          borderRadius: "0 0 8px 8px",
-          background:   "var(--surface)",
-          marginBottom: "4px",
+          border: "1.5px solid var(--primary)",
+          borderTop: "none",
+          borderRadius: "0 0 var(--radius-sm) var(--radius-sm)",
+          background: "var(--surface)",
+          zIndex: 10,
+          boxShadow: "var(--shadow-md)",
         }}>
-          {/* Search */}
-          <div style={{ padding: "8px", borderBottom: "1px solid var(--border)" }}>
+          <div style={{ padding: "8px" }}>
             <input
               autoFocus
               className="form-input"
-              style={{ height: "34px", fontSize: "13px" }}
-              placeholder="🔍  Cari kategori..."
+              style={{ fontSize: "13px", padding: "7px 10px" }}
+              placeholder="Cari kategori..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
             />
           </div>
-
-          {/* Options */}
-          <div style={{ maxHeight: "200px", overflowY: "auto" }}>
+          <div style={{ maxHeight: "180px", overflowY: "auto" }}>
             {filtered.length === 0 ? (
-              <div style={{ padding: "14px", textAlign: "center", color: "var(--text3)", fontSize: "13px" }}>
-                Tidak ada kategori
-              </div>
+              <div style={{ padding: "10px 14px", color: "var(--text3)", fontSize: "13px" }}>Tidak ditemukan</div>
             ) : (
               filtered.map((cat) => (
                 <div
                   key={cat}
                   onClick={() => select(cat)}
                   style={{
-                    padding:      "9px 14px",
-                    fontSize:     "14px",
-                    cursor:       "pointer",
-                    background:   value === cat ? "var(--primary-light)" : "transparent",
-                    color:        value === cat ? "var(--primary)" : "var(--text)",
-                    fontWeight:   value === cat ? 600 : 400,
+                    padding: "9px 14px",
+                    fontSize: "13px",
+                    cursor: "pointer",
+                    background: value === cat ? "var(--primary-light)" : "transparent",
+                    color: value === cat ? "var(--primary)" : "var(--text)",
+                    fontWeight: value === cat ? 600 : 400,
                     borderBottom: "1px solid var(--border)",
-                    transition:   "background 0.1s",
+                    transition: "background 0.1s",
                   }}
                   onMouseEnter={(e) => {
                     if (value !== cat) (e.currentTarget as HTMLDivElement).style.background = "var(--surface2)";
@@ -192,7 +187,7 @@ export default function ProductsClient({ initialProducts }: ProductsClientProps)
   }, [form.buy_price, form.sell_price]);
 
   const handlePriceChange = (field: "buy_price" | "sell_price", value: string) => {
-    const rawValue    = value.replace(/[^0-9]/g, "");
+    const rawValue = value.replace(/[^0-9]/g, "");
     const numericValue = parseInt(rawValue) || 0;
     setForm((prev) => ({ ...prev, [field]: numericValue }));
     const formatted = rawValue ? formatRupiah(numericValue).replace("Rp ", "") : "";
@@ -354,9 +349,9 @@ export default function ProductsClient({ initialProducts }: ProductsClientProps)
         ))}
       </div>
 
-      {/* Table */}
+      {/* ✅ Table — fixed height, scrollable, sticky header */}
       <div className="card">
-        <div className="table-wrap">
+        <div className="table-wrap products-table-wrap">
           <table>
             <thead>
               <tr>
@@ -457,7 +452,6 @@ export default function ProductsClient({ initialProducts }: ProductsClientProps)
           <div className="form-grid">
             <div className="form-group">
               <label className="form-label">Kategori</label>
-              {/* 👇 Searchable dropdown replaces plain <select> */}
               <CategorySelect
                 value={form.category}
                 onChange={(val) => setForm((prev) => ({ ...prev, category: val }))}
@@ -476,42 +470,31 @@ export default function ProductsClient({ initialProducts }: ProductsClientProps)
 
           <div className="form-grid">
             <div className="form-group">
-              <label className="form-label">Harga Beli (Rp) *</label>
-              <div style={{ position: "relative" }}>
-                <span style={{
-                  position: "absolute", left: "12px", top: "50%",
-                  transform: "translateY(-50%)", color: "var(--text3)",
-                  fontWeight: 600, pointerEvents: "none", fontSize: "13px",
-                }}>Rp</span>
-                <input
-                  className="form-input"
-                  style={{ paddingLeft: "36px" }}
-                  type="text"
-                  inputMode="numeric"
-                  value={displayBuyPrice}
-                  onChange={(e) => handlePriceChange("buy_price", e.target.value)}
-                  placeholder="0"
-                />
-              </div>
+              <label className="form-label">Harga Beli *</label>
+              <input
+                className="form-input"
+                value={displayBuyPrice}
+                onChange={(e) => handlePriceChange("buy_price", e.target.value)}
+                placeholder="0"
+                inputMode="numeric"
+              />
             </div>
             <div className="form-group">
-              <label className="form-label">Harga Jual (Rp) *</label>
-              <div style={{ position: "relative" }}>
-                <span style={{
-                  position: "absolute", left: "12px", top: "50%",
-                  transform: "translateY(-50%)", color: "var(--text3)",
-                  fontWeight: 600, pointerEvents: "none", fontSize: "13px",
-                }}>Rp</span>
-                <input
-                  className="form-input"
-                  style={{ paddingLeft: "36px" }}
-                  type="text"
-                  inputMode="numeric"
-                  value={displaySellPrice}
-                  onChange={(e) => handlePriceChange("sell_price", e.target.value)}
-                  placeholder="0"
-                />
-              </div>
+              <label className="form-label">
+                Harga Jual *
+                {margin > 0 && (
+                  <span className="text-success" style={{ marginLeft: "8px", fontWeight: 400 }}>
+                    Margin: {margin}%
+                  </span>
+                )}
+              </label>
+              <input
+                className="form-input"
+                value={displaySellPrice}
+                onChange={(e) => handlePriceChange("sell_price", e.target.value)}
+                placeholder="0"
+                inputMode="numeric"
+              />
             </div>
           </div>
 
@@ -526,7 +509,7 @@ export default function ProductsClient({ initialProducts }: ProductsClientProps)
               />
             </div>
             <div className="form-group">
-              <label className="form-label">Tanggal Expired (Opsional)</label>
+              <label className="form-label">Tanggal Expired</label>
               <input
                 className="form-input"
                 type="date"
@@ -535,34 +518,26 @@ export default function ProductsClient({ initialProducts }: ProductsClientProps)
               />
             </div>
           </div>
-
-          {form.buy_price > 0 && form.sell_price > 0 && (
-            <div className={`alert ${margin >= 0 ? "alert-success" : "alert-danger"}`}>
-              <CheckIcon />
-              Margin: {formatRupiah(form.sell_price - form.buy_price)} per unit ({margin}%)
-            </div>
-          )}
         </Modal>
       )}
 
       {/* Delete Modal */}
       {modal === "delete" && (
         <Modal
-          title="Hapus Produk?"
+          title="Hapus Produk"
           onClose={() => setModal(null)}
           footer={
             <>
               <button className="btn btn-ghost" onClick={() => setModal(null)}>Batal</button>
               <button className="btn btn-danger" onClick={handleDelete} disabled={saving}>
-                <TrashIcon /> {saving ? "Menghapus..." : "Hapus"}
+                {saving ? "Menghapus..." : "Ya, Hapus"}
               </button>
             </>
           }
         >
           <div className="confirm-dialog">
-            <div style={{ fontSize: "48px" }}>🗑️</div>
-            <p>Produk ini akan dihapus dari daftar.</p>
-            <p style={{ marginTop: "4px" }}>Riwayat transaksi tidak akan terpengaruh.</p>
+            <div style={{ fontSize: "40px" }}>🗑️</div>
+            <p>Yakin ingin menghapus produk ini? Data tidak bisa dikembalikan.</p>
           </div>
         </Modal>
       )}

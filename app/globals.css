@@ -389,6 +389,44 @@ tbody tr:hover { background: var(--bg); }
   font-size: 13px;
 }
 
+/* ─── Scrollable Table Container ─────────────────────────────────────────── */
+/* Used on Products page and dashboard cards to prevent infinite scrolling */
+.table-scroll {
+  overflow-y: auto;
+  overflow-x: auto;
+  /* Sticky thead when scrolling */
+}
+.table-scroll thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 1;
+  box-shadow: 0 1px 0 var(--border);
+}
+/* Products page full table - takes remaining page height */
+.products-table-wrap {
+  max-height: calc(100vh - 280px);
+  overflow-y: auto;
+  overflow-x: auto;
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+.products-table-wrap thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 1;
+  box-shadow: 0 1px 0 var(--border);
+}
+
+/* Dashboard cards - fixed height so they don't grow infinitely */
+.dashboard-card-scroll {
+  max-height: 280px;
+  overflow-y: auto;
+}
+.dashboard-card-scroll::-webkit-scrollbar { width: 4px; }
+.dashboard-card-scroll::-webkit-scrollbar-track { background: transparent; }
+.dashboard-card-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
+
 /* ─── Badges ─────────────────────────────────────────────────────────────── */
 .badge {
   display: inline-flex;
@@ -419,7 +457,6 @@ tbody tr:hover { background: var(--bg); }
   animation: fadeIn 0.15s ease;
 }
 
-/* Blur on pseudo-element so it never creates a stacking context on the overlay */
 .modal-overlay::before {
   content: "";
   position: fixed;
@@ -436,16 +473,14 @@ tbody tr:hover { background: var(--bg); }
   width: 100%;
   max-width: 520px;
   max-height: 90vh;
-  /* 👇 overflow visible so portaled children (dropdowns) aren't clipped */
   overflow-y: visible;
   animation: slideUp 0.2s ease;
 }
 
-/* Scroll only the body, not the whole modal */
 .modal-body {
   padding: 24px;
   overflow-y: auto;
-  max-height: calc(90vh - 130px); /* subtract header + footer height */
+  max-height: calc(90vh - 130px);
 }
 
 .modal-lg { max-width: 700px; }
@@ -500,6 +535,16 @@ tbody tr:hover { background: var(--bg); }
   gap: 12px;
   padding-bottom: 20px;
 }
+
+/* Kasir product grid: fixed height with scroll so it doesn't go on forever */
+.product-grid-wrap {
+  max-height: calc(100vh - 270px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.product-grid-wrap::-webkit-scrollbar { width: 4px; }
+.product-grid-wrap::-webkit-scrollbar-track { background: transparent; }
+.product-grid-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 99px; }
 
 .product-tile {
   background: var(--surface);
@@ -719,4 +764,8 @@ tbody tr:hover { background: var(--bg); }
   .page-content { padding: 16px; }
   .topbar { padding: 12px 16px; }
   .stat-value { font-size: 20px; }
+
+  .products-table-wrap { max-height: calc(100vh - 320px); }
+  .product-grid-wrap { max-height: 400px; }
+  .dashboard-card-scroll { max-height: 220px; }
 }

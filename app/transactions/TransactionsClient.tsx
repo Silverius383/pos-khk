@@ -309,47 +309,49 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
             ))}
           </div>
 
-          <div className="product-grid">
-            {filtered.map((p) => {
-              const inCart = cart.find((i) => i.product_id === p.id);
-              const isOut  = p.stock <= 0;
-              return (
-                <div
-                  key={p.id}
-                  className={`product-tile ${isOut ? "out" : ""}`}
-                  onClick={() => !isOut && addToCart(p)}
-                >
-                  {isExpired(p.expired_date) && (
-                    <div style={{ position: "absolute", top: 6, right: 6 }}>
-                      <span className="badge badge-danger" style={{ fontSize: "9px", padding: "2px 6px" }}>Expired</span>
-                    </div>
-                  )}
-                  {inCart && (
-                    <div style={{ position: "absolute", top: 6, left: 6 }}>
-                      <span className="badge badge-blue" style={{ fontSize: "9px", padding: "2px 6px" }}>
-                        {inCart.quantity}×
-                      </span>
-                    </div>
-                  )}
-                  {inCart && inCart.discount_type !== "none" && (
-                    <div style={{ position: "absolute", bottom: 6, right: 6 }}>
-                      <span className="badge badge-warning" style={{ fontSize: "9px", padding: "2px 6px" }}>
-                        🏷️ Diskon
-                      </span>
-                    </div>
-                  )}
-                  <div className="product-tile-cat">{p.category || "Umum"}</div>
-                  <div className="product-tile-name">{p.name}</div>
-                  <div className="product-tile-price">{formatRupiah(p.sell_price)}</div>
-                  <div className="product-tile-stock">{isOut ? "Habis" : `Stok: ${p.stock}`}</div>
+          <div className="product-grid-wrap">
+            <div className="product-grid">
+              {filtered.map((p) => {
+                const inCart = cart.find((i) => i.product_id === p.id);
+                const isOut  = p.stock <= 0;
+                return (
+                  <div
+                    key={p.id}
+                    className={`product-tile ${isOut ? "out" : ""}`}
+                    onClick={() => !isOut && addToCart(p)}
+                  >
+                    {isExpired(p.expired_date) && (
+                      <div style={{ position: "absolute", top: 6, right: 6 }}>
+                        <span className="badge badge-danger" style={{ fontSize: "9px", padding: "2px 6px" }}>Expired</span>
+                      </div>
+                    )}
+                    {inCart && (
+                      <div style={{ position: "absolute", top: 6, left: 6 }}>
+                        <span className="badge badge-blue" style={{ fontSize: "9px", padding: "2px 6px" }}>
+                          {inCart.quantity}×
+                        </span>
+                      </div>
+                    )}
+                    {inCart && inCart.discount_type !== "none" && (
+                      <div style={{ position: "absolute", bottom: 6, right: 6 }}>
+                        <span className="badge badge-warning" style={{ fontSize: "9px", padding: "2px 6px" }}>
+                          🏷️ Diskon
+                        </span>
+                      </div>
+                    )}
+                    <div className="product-tile-cat">{p.category || "Umum"}</div>
+                    <div className="product-tile-name">{p.name}</div>
+                    <div className="product-tile-price">{formatRupiah(p.sell_price)}</div>
+                    <div className="product-tile-stock">{isOut ? "Habis" : `Stok: ${p.stock}`}</div>
+                  </div>
+                );
+              })}
+              {filtered.length === 0 && (
+                <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "40px", color: "var(--text3)" }}>
+                  Produk tidak ditemukan
                 </div>
-              );
-            })}
-            {filtered.length === 0 && (
-              <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "40px", color: "var(--text3)" }}>
-                Produk tidak ditemukan
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
 
