@@ -1,7 +1,8 @@
 // app/products/ProductsClient.tsx
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect } from "react";
+
 import { useRouter } from "next/navigation";
 import { Product, ProductFormData } from "@/types";
 import { formatRupiah, calculateMarginPercent } from "@/utils/currency";
@@ -61,7 +62,7 @@ interface ProductsClientProps {
 
 type ModalType = "add" | "edit" | "delete" | null;
 
-// ── Searchable Category Dropdown ────────────────────────────────────────────
+// ── Searchable Category — inline expanding (no float/portal needed) ──────────
 function CategorySelect({
   value,
   onChange,
@@ -71,24 +72,11 @@ function CategorySelect({
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const ref = useRef<HTMLDivElement>(null);
 
   const filtered = useMemo(
     () => CATEGORIES.filter((c) => c.toLowerCase().includes(search.toLowerCase())),
     [search]
   );
-
-  // Close on outside click
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-        setSearch("");
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
 
   const select = (cat: string) => {
     onChange(cat);
@@ -97,18 +85,21 @@ function CategorySelect({
   };
 
   return (
-    <div ref={ref} style={{ position: "relative" }}>
-      {/* Trigger */}
+    <div>
+      {/* Trigger button */}
       <div
         className="form-input"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => { setOpen((o) => !o); setSearch(""); }}
         style={{
           cursor: "pointer",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
           userSelect: "none",
-          color: value ? "var(--text1)" : "var(--text3)",
+          color: value ? "var(--text)" : "var(--text3)",
+          borderBottomLeftRadius:  open ? 0 : undefined,
+          borderBottomRightRadius: open ? 0 : undefined,
+          borderBottom: open ? "1.5px solid var(--primary)" : undefined,
         }}
       >
         <span style={{ fontSize: "14px" }}>{value || "Pilih kategori..."}</span>
@@ -120,43 +111,31 @@ function CategorySelect({
         }}>▼</span>
       </div>
 
-      {/* Dropdown */}
+      {/* Inline expanding panel — no positioning, flows naturally in the form */}
       {open && (
         <div style={{
-          position: "absolute",
-          top: "calc(100% + 4px)",
-          left: 0,
-          right: 0,
-          background: "var(--surface1)",
-          border: "1px solid var(--border)",
-          borderRadius: "10px",
-          boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
-          zIndex: 100,
-          overflow: "hidden",
+          border:       "1.5px solid var(--primary)",
+          borderTop:    "none",
+          borderRadius: "0 0 8px 8px",
+          background:   "var(--surface)",
+          marginBottom: "4px",
         }}>
-          {/* Search inside dropdown */}
+          {/* Search */}
           <div style={{ padding: "8px", borderBottom: "1px solid var(--border)" }}>
-            <div style={{ position: "relative" }}>
-              <span style={{
-                position: "absolute", left: "10px", top: "50%",
-                transform: "translateY(-50%)", color: "var(--text3)", fontSize: "13px",
-              }}>🔍</span>
-              <input
-                autoFocus
-                className="form-input"
-                style={{ paddingLeft: "30px", height: "34px", fontSize: "13px" }}
-                placeholder="Cari kategori..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-              />
-            </div>
+            <input
+              autoFocus
+              className="form-input"
+              style={{ height: "34px", fontSize: "13px" }}
+              placeholder="🔍  Cari kategori..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
 
           {/* Options */}
-          <div style={{ maxHeight: "220px", overflowY: "auto" }}>
+          <div style={{ maxHeight: "200px", overflowY: "auto" }}>
             {filtered.length === 0 ? (
-              <div style={{ padding: "16px", textAlign: "center", color: "var(--text3)", fontSize: "13px" }}>
+              <div style={{ padding: "14px", textAlign: "center", color: "var(--text3)", fontSize: "13px" }}>
                 Tidak ada kategori
               </div>
             ) : (
@@ -165,20 +144,20 @@ function CategorySelect({
                   key={cat}
                   onClick={() => select(cat)}
                   style={{
-                    padding: "10px 14px",
-                    fontSize: "14px",
-                    cursor: "pointer",
-                    background: value === cat ? "var(--primary-light, #EEF2FF)" : "transparent",
-                    color: value === cat ? "var(--primary)" : "var(--text1)",
-                    fontWeight: value === cat ? 600 : 400,
+                    padding:      "9px 14px",
+                    fontSize:     "14px",
+                    cursor:       "pointer",
+                    background:   value === cat ? "var(--primary-light)" : "transparent",
+                    color:        value === cat ? "var(--primary)" : "var(--text)",
+                    fontWeight:   value === cat ? 600 : 400,
                     borderBottom: "1px solid var(--border)",
-                    transition: "background 0.1s",
+                    transition:   "background 0.1s",
                   }}
                   onMouseEnter={(e) => {
                     if (value !== cat) (e.currentTarget as HTMLDivElement).style.background = "var(--surface2)";
                   }}
                   onMouseLeave={(e) => {
-                    if (value !== cat) (e.currentTarget as HTMLDivElement).style.background = "transparent";
+                    if (value !== cat) (e.currentTarget as HTMLDivElement).style.background = value === cat ? "var(--primary-light)" : "transparent";
                   }}
                 >
                   {cat}
