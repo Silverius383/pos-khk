@@ -101,7 +101,7 @@ export default function LoginPage() {
 
         <p style={{ marginTop: "20px", fontSize: "12px", color: "var(--text3)", textAlign: "center" }}>
           Password default: <strong style={{ color: "var(--text2)" }}>admin123</strong><br />
-          Ubah di file <code style={{ background: "var(--surface2)", padding: "1px 6px", borderRadius: "4px" }}>.env.local</code>
+          {/* Ubah di file <code style={{ background: "var(--surface2)", padding: "1px 6px", borderRadius: "4px" }}>.env.local</code> */}
         </p>
       </div>
     </div>
