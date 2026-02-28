@@ -46,7 +46,7 @@ export default async function ReportsPage() {
       </AppLayout>
     );
   } catch (error) {
-    console.error("Reports DB error:", error);
+    console.error("Reports DB error: ", error);
     return (
       <AppLayout title="Laporan Penjualan">
         <div className="alert alert-danger">
