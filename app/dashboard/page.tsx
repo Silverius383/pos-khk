@@ -1,6 +1,4 @@
 // app/dashboard/page.tsx
-"use client";
-
 export const dynamic = "force-dynamic";
 import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
@@ -13,8 +11,18 @@ export default async function DashboardPage() {
   if (!session.isLoggedIn) redirect("/login");
 
   const now = new Date();
-  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const todayStart = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate()
+  ));
+
+  const monthStart = new Date(Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    1
+  ));
 
   try {
     const [todayTx, monthTx, todayExp, monthExp, recentTransactions, allProducts] =
