@@ -30,6 +30,7 @@ function DiscountModal({
   const discountAmt   = calculateDiscountAmount(item.sell_price, type, numVal);
   const finalPriceVal = calculateFinalPrice(item.sell_price, type, numVal);
   const isValid       = type === "none" || (numVal > 0 && finalPriceVal >= 0);
+  const [cartOpen, setCartOpen] = useState(false);
 
   const handleSave = () => {
     if (type === "none") {
