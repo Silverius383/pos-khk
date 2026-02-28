@@ -1,9 +1,8 @@
 // public/sw.js
-const CACHE_NAME = "khk-pos-v2";
+const CACHE_NAME = "khk-pos-v3";
 
 const PRECACHE_URLS = [
   "/dashboard",
-  "/manifest.webmanifest",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
 ];
@@ -32,25 +31,40 @@ self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Only handle GET from same origin
+  // Only handle GET same-origin
   if (request.method !== "GET" || url.origin !== self.location.origin) return;
 
-  // API: always network only
+  // API → network only
   if (url.pathname.startsWith("/api/")) {
     event.respondWith(fetch(request));
     return;
   }
 
-  // Everything else: network first, cache fallback
-  event.respondWith(
-    fetch(request)
-      .then((response) => {
-        if (response.ok) {
+  // Jangan pernah cache manifest
+  if (url.pathname.endsWith(".webmanifest")) {
+    event.respondWith(fetch(request));
+    return;
+  }
+
+  // Cache hanya untuk assets statis
+  if (
+    request.destination === "script" ||
+    request.destination === "style" ||
+    request.destination === "image" ||
+    request.destination === "font"
+  ) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        if (cached) return cached;
+
+        return fetch(request).then((response) => {
+          if (!response || response.status !== 200) return response;
+
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-        }
-        return response;
+          return response;
+        });
       })
-      .catch(() => caches.match(request))
-  );
+    );
+  }
 });
