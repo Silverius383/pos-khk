@@ -13,7 +13,9 @@ export async function GET(
 
   try {
     const { id } = await params;
-    const product = await prisma.product.findUnique({ where: { id } });
+    const product = await prisma.product.findFirst({
+      where: { id, deleted_at: null }, // 👈 exclude soft-deleted
+    });
     if (!product) {
       return NextResponse.json({ success: false, error: "Produk tidak ditemukan" }, { status: 404 });
     }
@@ -38,6 +40,12 @@ export async function PUT(
 
     if (!name || !buy_price || !sell_price) {
       return NextResponse.json({ success: false, error: "Nama, harga beli, dan harga jual wajib diisi" }, { status: 400 });
+    }
+
+    // 👇 Prevent updating a soft-deleted product
+    const existing = await prisma.product.findFirst({ where: { id, deleted_at: null } });
+    if (!existing) {
+      return NextResponse.json({ success: false, error: "Produk tidak ditemukan" }, { status: 404 });
     }
 
     const product = await prisma.product.update({
@@ -70,10 +78,21 @@ export async function DELETE(
 
   try {
     const { id } = await params;
-    await prisma.product.delete({ where: { id } });
+
+    // 👇 Soft delete: set deleted_at instead of removing the row
+    const product = await prisma.product.findFirst({ where: { id, deleted_at: null } });
+    if (!product) {
+      return NextResponse.json({ success: false, error: "Produk tidak ditemukan" }, { status: 404 });
+    }
+
+    await prisma.product.update({
+      where: { id },
+      data: { deleted_at: new Date() },
+    });
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("DELETE /api/products error:", error);
-    return NextResponse.json({ success: false, error: "Gagal menghapus produk. Mungkin masih ada transaksi terkait." }, { status: 500 });
+    return NextResponse.json({ success: false, error: "Gagal menghapus produk" }, { status: 500 });
   }
 }
