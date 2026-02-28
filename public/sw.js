@@ -3,7 +3,7 @@ const CACHE_NAME = "khk-pos-v2";
 
 const PRECACHE_URLS = [
   "/dashboard",
-  "/manifest.json",
+  "/manifest.webmanifest",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
 ];
