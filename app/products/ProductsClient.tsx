@@ -1,7 +1,7 @@
 // app/products/ProductsClient.tsx
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Product, ProductFormData } from "@/types";
 import { formatRupiah, calculateMarginPercent } from "@/utils/currency";
@@ -17,12 +17,182 @@ const EMPTY_FORM: ProductFormData = {
   stock: 0, min_stock: 5, expired_date: "",
 };
 
+const CATEGORIES = [
+  "Daging Sapi & Ayam",
+  "Fillet Dori",
+  "French Fries",
+  "Belfoods Nugget",
+  "Champ Nugget",
+  "Kanzler Nugget",
+  "So Good Nugget",
+  "Sosis",
+  "Ayam Goreng",
+  "Cordon Bleu, Katsu, Fish & Chips",
+  "Siomay Ayam",
+  "Cedea",
+  "Giziplus",
+  "Indomina",
+  "Minaku",
+  "Pak Den",
+  "Sunfish",
+  "Bakso",
+  "Italian Pizza & Garlic Bread",
+  "Roti Burger, Hot Dog & Isian",
+  "Smoke Beef Ham",
+  "Home Made Olahan Ayam",
+  "Home Made Risoles",
+  "Home Made Jajanan",
+  "Home Made Cireng",
+  "Edamame",
+  "Kebab",
+  "Minipao & Donat",
+  "Singkong D9",
+  "Jagung Pipil Manis",
+  "Mixed Vegetables",
+  "Tahu Tofu",
+  "Kulit Dimsum / Lumpia",
+  "Bumbu Tomyum",
+  "Saus & Kecap",
+];
+
 interface ProductsClientProps {
   initialProducts: Product[];
 }
 
 type ModalType = "add" | "edit" | "delete" | null;
 
+// ── Searchable Category Dropdown ────────────────────────────────────────────
+function CategorySelect({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  const filtered = useMemo(
+    () => CATEGORIES.filter((c) => c.toLowerCase().includes(search.toLowerCase())),
+    [search]
+  );
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        setSearch("");
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const select = (cat: string) => {
+    onChange(cat);
+    setOpen(false);
+    setSearch("");
+  };
+
+  return (
+    <div ref={ref} style={{ position: "relative" }}>
+      {/* Trigger */}
+      <div
+        className="form-input"
+        onClick={() => setOpen((o) => !o)}
+        style={{
+          cursor: "pointer",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          userSelect: "none",
+          color: value ? "var(--text1)" : "var(--text3)",
+        }}
+      >
+        <span style={{ fontSize: "14px" }}>{value || "Pilih kategori..."}</span>
+        <span style={{
+          fontSize: "10px",
+          color: "var(--text3)",
+          transform: open ? "rotate(180deg)" : "rotate(0deg)",
+          transition: "transform 0.15s ease",
+        }}>▼</span>
+      </div>
+
+      {/* Dropdown */}
+      {open && (
+        <div style={{
+          position: "absolute",
+          top: "calc(100% + 4px)",
+          left: 0,
+          right: 0,
+          background: "var(--surface1)",
+          border: "1px solid var(--border)",
+          borderRadius: "10px",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+          zIndex: 100,
+          overflow: "hidden",
+        }}>
+          {/* Search inside dropdown */}
+          <div style={{ padding: "8px", borderBottom: "1px solid var(--border)" }}>
+            <div style={{ position: "relative" }}>
+              <span style={{
+                position: "absolute", left: "10px", top: "50%",
+                transform: "translateY(-50%)", color: "var(--text3)", fontSize: "13px",
+              }}>🔍</span>
+              <input
+                autoFocus
+                className="form-input"
+                style={{ paddingLeft: "30px", height: "34px", fontSize: "13px" }}
+                placeholder="Cari kategori..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          </div>
+
+          {/* Options */}
+          <div style={{ maxHeight: "220px", overflowY: "auto" }}>
+            {filtered.length === 0 ? (
+              <div style={{ padding: "16px", textAlign: "center", color: "var(--text3)", fontSize: "13px" }}>
+                Tidak ada kategori
+              </div>
+            ) : (
+              filtered.map((cat) => (
+                <div
+                  key={cat}
+                  onClick={() => select(cat)}
+                  style={{
+                    padding: "10px 14px",
+                    fontSize: "14px",
+                    cursor: "pointer",
+                    background: value === cat ? "var(--primary-light, #EEF2FF)" : "transparent",
+                    color: value === cat ? "var(--primary)" : "var(--text1)",
+                    fontWeight: value === cat ? 600 : 400,
+                    borderBottom: "1px solid var(--border)",
+                    transition: "background 0.1s",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (value !== cat) (e.currentTarget as HTMLDivElement).style.background = "var(--surface2)";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (value !== cat) (e.currentTarget as HTMLDivElement).style.background = "transparent";
+                  }}
+                >
+                  {cat}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Main Component ───────────────────────────────────────────────────────────
 export default function ProductsClient({ initialProducts }: ProductsClientProps) {
   const router = useRouter();
   const [products, setProducts] = useState<Product[]>(initialProducts);
@@ -38,24 +208,17 @@ export default function ProductsClient({ initialProducts }: ProductsClientProps)
   const [displaySellPrice, setDisplaySellPrice] = useState("");
 
   useEffect(() => {
-    setDisplayBuyPrice(form.buy_price ? formatRupiah(form.buy_price).replace('Rp ', '') : "");
-    setDisplaySellPrice(form.sell_price ? formatRupiah(form.sell_price).replace('Rp ', '') : "");
+    setDisplayBuyPrice(form.buy_price ? formatRupiah(form.buy_price).replace("Rp ", "") : "");
+    setDisplaySellPrice(form.sell_price ? formatRupiah(form.sell_price).replace("Rp ", "") : "");
   }, [form.buy_price, form.sell_price]);
 
-  const handlePriceChange = (field: 'buy_price' | 'sell_price', value: string) => {
-    const rawValue = value.replace(/[^0-9]/g, '');
+  const handlePriceChange = (field: "buy_price" | "sell_price", value: string) => {
+    const rawValue    = value.replace(/[^0-9]/g, "");
     const numericValue = parseInt(rawValue) || 0;
-    
-    // Update form state
     setForm((prev) => ({ ...prev, [field]: numericValue }));
-    
-    // Update display
-    const formatted = rawValue ? formatRupiah(numericValue).replace('Rp ', '') : "";
-    if (field === 'buy_price') {
-      setDisplayBuyPrice(formatted);
-    } else {
-      setDisplaySellPrice(formatted);
-    }
+    const formatted = rawValue ? formatRupiah(numericValue).replace("Rp ", "") : "";
+    if (field === "buy_price") setDisplayBuyPrice(formatted);
+    else setDisplaySellPrice(formatted);
   };
 
   const categories = useMemo(
@@ -84,12 +247,12 @@ export default function ProductsClient({ initialProducts }: ProductsClientProps)
 
   const openEdit = (p: Product) => {
     setForm({
-      name: p.name,
-      category: p.category,
-      buy_price: p.buy_price,
-      sell_price: p.sell_price,
-      stock: p.stock,
-      min_stock: p.min_stock,
+      name:         p.name,
+      category:     p.category,
+      buy_price:    p.buy_price,
+      sell_price:   p.sell_price,
+      stock:        p.stock,
+      min_stock:    p.min_stock,
       expired_date: p.expired_date
         ? new Date(p.expired_date).toISOString().split("T")[0]
         : "",
@@ -114,15 +277,14 @@ export default function ProductsClient({ initialProducts }: ProductsClientProps)
     setError("");
 
     try {
-      const url = modal === "add" ? "/api/products" : `/api/products/${editId}`;
+      const url    = modal === "add" ? "/api/products" : `/api/products/${editId}`;
       const method = modal === "add" ? "POST" : "PUT";
 
-      const res = await fetch(url, {
+      const res  = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-
       const data = await res.json();
 
       if (!data.success) {
@@ -130,13 +292,10 @@ export default function ProductsClient({ initialProducts }: ProductsClientProps)
         return;
       }
 
-      // Update local state
       if (modal === "add") {
         setProducts((prev) => [...prev, data.data].sort((a, b) => a.name.localeCompare(b.name)));
       } else {
-        setProducts((prev) =>
-          prev.map((p) => (p.id === editId ? data.data : p))
-        );
+        setProducts((prev) => prev.map((p) => (p.id === editId ? data.data : p)));
       }
 
       setModal(null);
@@ -153,7 +312,7 @@ export default function ProductsClient({ initialProducts }: ProductsClientProps)
     setSaving(true);
 
     try {
-      const res = await fetch(`/api/products/${deleteId}`, { method: "DELETE" });
+      const res  = await fetch(`/api/products/${deleteId}`, { method: "DELETE" });
       const data = await res.json();
 
       if (!data.success) {
@@ -169,15 +328,6 @@ export default function ProductsClient({ initialProducts }: ProductsClientProps)
     } finally {
       setSaving(false);
     }
-  };
-
-  const fSelect =
-  (key: keyof ProductFormData) =>
-  (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setForm((prev) => ({
-      ...prev,
-      [key]: e.target.value,
-    }));
   };
 
   const f = (key: keyof ProductFormData) => (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -264,15 +414,9 @@ export default function ProductsClient({ initialProducts }: ProductsClientProps)
                     {calculateMarginPercent(p.sell_price, p.buy_price)}%
                   </td>
                   <td>
-                    <span
-                      className={`badge ${
-                        p.stock === 0
-                          ? "badge-danger"
-                          : p.stock <= p.min_stock
-                          ? "badge-warning"
-                          : "badge-success"
-                      }`}
-                    >
+                    <span className={`badge ${
+                      p.stock === 0 ? "badge-danger" : p.stock <= p.min_stock ? "badge-warning" : "badge-success"
+                    }`}>
                       {p.stock}
                     </span>
                   </td>
@@ -312,9 +456,7 @@ export default function ProductsClient({ initialProducts }: ProductsClientProps)
           onClose={() => setModal(null)}
           footer={
             <>
-              <button className="btn btn-ghost" onClick={() => setModal(null)}>
-                Batal
-              </button>
+              <button className="btn btn-ghost" onClick={() => setModal(null)}>Batal</button>
               <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
                 <CheckIcon /> {saving ? "Menyimpan..." : "Simpan"}
               </button>
@@ -336,19 +478,11 @@ export default function ProductsClient({ initialProducts }: ProductsClientProps)
           <div className="form-grid">
             <div className="form-group">
               <label className="form-label">Kategori</label>
-              <select
-                className="form-input"
+              {/* 👇 Searchable dropdown replaces plain <select> */}
+              <CategorySelect
                 value={form.category}
-                onChange={fSelect("category")}
-              >
-                <option value="" disabled>Pilih kategori...</option>
-                <option value="Nugget">Nugget</option>
-                <option value="Sosis">Sosis</option>
-                <option value="Bakso">Bakso</option>
-                <option value="Dimsum">Dimsum</option>
-                <option value="Kentang">Kentang</option>
-                <option value="Daging">Daging</option>
-              </select>
+                onChange={(val) => setForm((prev) => ({ ...prev, category: val }))}
+              />
             </div>
             <div className="form-group">
               <label className="form-label">Stok Minimum (Alert)</label>
@@ -363,38 +497,43 @@ export default function ProductsClient({ initialProducts }: ProductsClientProps)
 
           <div className="form-grid">
             <div className="form-group">
-  <label className="form-label">Harga Beli (Rp) *</label>
-  <div className="relative">
-    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">
-      Rp
-    </span>
-    <input
-      className="form-input pl-10"
-      type="text"
-      inputMode="numeric"
-      value={displayBuyPrice}
-      onChange={(e) => handlePriceChange('buy_price', e.target.value)}
-      placeholder="0"
-    />
-  </div>
-</div>
-
-<div className="form-group">
-  <label className="form-label">Harga Jual (Rp) *</label>
-  <div className="relative">
-    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-medium">
-      Rp
-    </span>
-    <input
-      className="form-input pl-10"
-      type="text"
-      inputMode="numeric"
-      value={displaySellPrice}
-      onChange={(e) => handlePriceChange('sell_price', e.target.value)}
-      placeholder="0"
-    />
-  </div>
-</div>
+              <label className="form-label">Harga Beli (Rp) *</label>
+              <div style={{ position: "relative" }}>
+                <span style={{
+                  position: "absolute", left: "12px", top: "50%",
+                  transform: "translateY(-50%)", color: "var(--text3)",
+                  fontWeight: 600, pointerEvents: "none", fontSize: "13px",
+                }}>Rp</span>
+                <input
+                  className="form-input"
+                  style={{ paddingLeft: "36px" }}
+                  type="text"
+                  inputMode="numeric"
+                  value={displayBuyPrice}
+                  onChange={(e) => handlePriceChange("buy_price", e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+            <div className="form-group">
+              <label className="form-label">Harga Jual (Rp) *</label>
+              <div style={{ position: "relative" }}>
+                <span style={{
+                  position: "absolute", left: "12px", top: "50%",
+                  transform: "translateY(-50%)", color: "var(--text3)",
+                  fontWeight: 600, pointerEvents: "none", fontSize: "13px",
+                }}>Rp</span>
+                <input
+                  className="form-input"
+                  style={{ paddingLeft: "36px" }}
+                  type="text"
+                  inputMode="numeric"
+                  value={displaySellPrice}
+                  onChange={(e) => handlePriceChange("sell_price", e.target.value)}
+                  placeholder="0"
+                />
+              </div>
+            </div>
           </div>
 
           <div className="form-grid">
@@ -434,9 +573,7 @@ export default function ProductsClient({ initialProducts }: ProductsClientProps)
           onClose={() => setModal(null)}
           footer={
             <>
-              <button className="btn btn-ghost" onClick={() => setModal(null)}>
-                Batal
-              </button>
+              <button className="btn btn-ghost" onClick={() => setModal(null)}>Batal</button>
               <button className="btn btn-danger" onClick={handleDelete} disabled={saving}>
                 <TrashIcon /> {saving ? "Menghapus..." : "Hapus"}
               </button>
@@ -445,7 +582,7 @@ export default function ProductsClient({ initialProducts }: ProductsClientProps)
         >
           <div className="confirm-dialog">
             <div style={{ fontSize: "48px" }}>🗑️</div>
-            <p>Produk ini akan dihapus permanen.</p>
+            <p>Produk ini akan dihapus dari daftar.</p>
             <p style={{ marginTop: "4px" }}>Riwayat transaksi tidak akan terpengaruh.</p>
           </div>
         </Modal>
