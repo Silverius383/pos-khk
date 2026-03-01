@@ -1,7 +1,7 @@
 // app/transactions/TransactionsClient.tsx
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Product, CartItem, Transaction, DiscountType } from "@/types";
 import { formatRupiah, calculateDiscountAmount, calculateFinalPrice } from "@/utils/currency";
@@ -13,7 +13,6 @@ interface TransactionsClientProps {
   initialProducts: Product[];
 }
 
-// Modal untuk edit diskon satu item keranjang
 function DiscountModal({
   item,
   onSave,
@@ -30,7 +29,6 @@ function DiscountModal({
   const discountAmt   = calculateDiscountAmount(item.sell_price, type, numVal);
   const finalPriceVal = calculateFinalPrice(item.sell_price, type, numVal);
   const isValid       = type === "none" || (numVal > 0 && finalPriceVal >= 0);
-  const [cartOpen, setCartOpen] = useState(false);
 
   const handleSave = () => {
     if (type === "none") {
@@ -51,7 +49,6 @@ function DiscountModal({
         </>
       }
     >
-      {/* Tipe diskon */}
       <div className="form-group">
         <label className="form-label">Tipe Diskon</label>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
@@ -77,11 +74,10 @@ function DiscountModal({
         </div>
       </div>
 
-      {/* Input nilai diskon */}
       {type !== "none" && (
         <div className="form-group">
           <label className="form-label">
-            {type === "percent" ? "Besar Diskon (%)" : "Besar Diskon (Rp)"}
+            {type === "percent" ? "Persentase Diskon (%)" : "Nominal Diskon (Rp)"}
           </label>
           <input
             className="form-input"
@@ -89,58 +85,47 @@ function DiscountModal({
             value={value}
             onChange={(e) => setValue(e.target.value)}
             placeholder={type === "percent" ? "Contoh: 10" : "Contoh: 5000"}
-            min={0}
-            max={type === "percent" ? 100 : item.sell_price}
-            autoFocus
-            style={{ fontSize: "16px", padding: "12px" }}
+            min="0"
+            max={type === "percent" ? "100" : undefined}
           />
-          {type === "percent" && numVal > 100 && (
-            <div style={{ color: "var(--danger)", fontSize: "12px", marginTop: "4px" }}>
-              Maksimal 100%
-            </div>
-          )}
         </div>
       )}
 
-      {/* Preview */}
-      <div style={{
-        background: "var(--surface2)",
-        borderRadius: "8px",
-        padding: "14px",
-        marginTop: "4px",
-      }}>
-        <div style={{ fontSize: "13px", color: "var(--text2)", marginBottom: "8px", fontWeight: 600 }}>
-          Preview Harga
-        </div>
-        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "4px" }}>
-          <span style={{ color: "var(--text2)" }}>Harga Normal</span>
-          <span className="td-mono">{formatRupiah(item.sell_price)}</span>
-        </div>
-        {type !== "none" && discountAmt > 0 && (
-          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "4px" }}>
-            <span style={{ color: "var(--danger)" }}>
+      {type !== "none" && numVal > 0 && (
+        <div style={{
+          background: "var(--surface2)",
+          borderRadius: "var(--radius-sm)",
+          padding: "12px 16px",
+          fontSize: "13px",
+        }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+            <span className="text-muted">Harga Normal</span>
+            <span className="td-mono">{formatRupiah(item.sell_price)}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+            <span style={{ color: "var(--warning)" }}>
               Diskon {type === "percent" ? `${numVal}%` : "Nominal"}
             </span>
             <span className="td-mono" style={{ color: "var(--danger)" }}>
               − {formatRupiah(discountAmt)}
             </span>
           </div>
-        )}
-        <div style={{
-          display: "flex",
-          justifyContent: "space-between",
-          fontSize: "15px",
-          fontWeight: 800,
-          paddingTop: "8px",
-          borderTop: "1px solid var(--border)",
-          marginTop: "4px",
-        }}>
-          <span>Harga Akhir</span>
-          <span className="td-mono" style={{ color: "var(--primary)" }}>
-            {formatRupiah(finalPriceVal)}
-          </span>
+          <div style={{
+            display: "flex",
+            justifyContent: "space-between",
+            fontSize: "15px",
+            fontWeight: 800,
+            paddingTop: "8px",
+            borderTop: "1px solid var(--border)",
+            marginTop: "4px",
+          }}>
+            <span>Harga Akhir</span>
+            <span className="td-mono" style={{ color: "var(--primary)" }}>
+              {formatRupiah(finalPriceVal)}
+            </span>
+          </div>
         </div>
-      </div>
+      )}
     </Modal>
   );
 }
@@ -155,6 +140,9 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
   const [receipt, setReceipt]   = useState<Transaction | null>(null);
   const [error, setError]       = useState("");
   const [discountModal, setDiscountModal] = useState<CartItem | null>(null);
+
+  // ── Bottom Sheet state (mobile only) ───────────────────────────────────────
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   const categories = useMemo(
     () => ["Semua", ...Array.from(new Set(products.map((p) => p.category).filter(Boolean)))],
@@ -215,7 +203,6 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
 
   const removeItem = (productId: string) => setCart((prev) => prev.filter((i) => i.product_id !== productId));
 
-  // Terapkan diskon ke item keranjang
   const applyDiscount = (productId: string, type: DiscountType, value: number) => {
     setCart((prev) =>
       prev.map((i) => {
@@ -228,7 +215,6 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
     setDiscountModal(null);
   };
 
-  // Kalkulasi total keranjang
   const subtotalNormal  = cart.reduce((s, i) => s + i.sell_price * i.quantity, 0);
   const totalDiscount   = cart.reduce((s, i) => s + i.discount_amount * i.quantity, 0);
   const totalFinal      = cart.reduce((s, i) => s + i.final_price * i.quantity, 0);
@@ -263,7 +249,6 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
         return;
       }
 
-      // Update stok lokal
       setProducts((prev) =>
         prev.map((p) => {
           const item = cart.find((i) => i.product_id === p.id);
@@ -273,6 +258,7 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
 
       setReceipt(data.data);
       setCart([]);
+      setSheetOpen(false);
       router.refresh();
     } catch {
       setError("Gagal memproses transaksi. Coba lagi.");
@@ -281,12 +267,118 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
     }
   };
 
+  // ── Cart Items JSX (shared between desktop panel & mobile sheet) ───────────
+  const CartItemsList = () => (
+    <>
+      {cart.length === 0 ? (
+        <div className="cart-empty">
+          <span style={{ fontSize: "32px" }}>🛒</span>
+          <span style={{ fontSize: "14px" }}>Keranjang kosong</span>
+        </div>
+      ) : (
+        <div className="cart-items">
+          {cart.map((item) => {
+            const hasItemDiscount = item.discount_type !== "none" && item.discount_amount > 0;
+            return (
+              <div key={item.product_id} className="cart-item">
+                <div className="cart-item-info">
+                  <div className="cart-item-name">{item.product_name}</div>
+                  <div className="cart-item-price">
+                    {formatRupiah(item.final_price)} × {item.quantity} ={" "}
+                    <strong>{formatRupiah(item.final_price * item.quantity)}</strong>
+                  </div>
+                  {hasItemDiscount ? (
+                    <span className="badge badge-warning" style={{ fontSize: "11px" }}>
+                      🏷️ Diskon{" "}
+                      {item.discount_type === "percent"
+                        ? `${item.discount_value}%`
+                        : formatRupiah(item.discount_value)}
+                      {" (−"}{formatRupiah(item.discount_amount * item.quantity)}{")"}
+                    </span>
+                  ) : (
+                    <span style={{ fontSize: "11px", color: "var(--text3)" }}>Tidak ada diskon</span>
+                  )}
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    style={{ padding: "4px 10px", fontSize: "12px" }}
+                    onClick={() => setDiscountModal(item)}
+                  >
+                    <EditIcon size={12} /> {hasItemDiscount ? "Ubah" : "Tambah"} Diskon
+                  </button>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
+                  <div className="cart-qty">
+                    <button className="qty-btn" onClick={() => updateQty(item.product_id, -1)}>−</button>
+                    <span className="qty-val">{item.quantity}</span>
+                    <button className="qty-btn" onClick={() => updateQty(item.product_id, +1)}>+</button>
+                  </div>
+                  <button
+                    style={{ background: "none", border: "none", cursor: "pointer", color: "var(--danger)", padding: "4px" }}
+                    onClick={() => removeItem(item.product_id)}
+                  >
+                    <TrashIcon size={16} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </>
+  );
+
+  // ── Cart Footer JSX (shared) ───────────────────────────────────────────────
+  const CartFooter = () => (
+    <div className="cart-footer">
+      <div className="cart-total-row">
+        <span className="text-muted">Subtotal Normal</span>
+        <span className="cart-total-val td-mono">{formatRupiah(subtotalNormal)}</span>
+      </div>
+      {hasDiscount && (
+        <div className="cart-total-row">
+          <span style={{ color: "var(--warning)" }}>🏷️ Total Diskon</span>
+          <span className="cart-total-val td-mono" style={{ color: "var(--warning)" }}>
+            − {formatRupiah(totalDiscount)}
+          </span>
+        </div>
+      )}
+      <div className="cart-total-row">
+        <span className="text-muted">Est. Profit</span>
+        <span className={`cart-total-val td-mono ${estimasiProfit >= 0 ? "text-success" : "text-danger"}`}>
+          {formatRupiah(estimasiProfit)}
+        </span>
+      </div>
+      <div className="cart-total-row big">
+        <span>TOTAL BAYAR</span>
+        <span className="cart-total-val">{formatRupiah(totalFinal)}</span>
+      </div>
+      <button
+        className="btn btn-success btn-lg"
+        style={{ width: "100%", marginTop: "12px" }}
+        onClick={checkout}
+        disabled={cart.length === 0 || processing}
+      >
+        {processing ? "⏳ Memproses..." : "✅ Proses Transaksi"}
+      </button>
+      {cart.length > 0 && (
+        <button
+          className="btn btn-ghost"
+          style={{ width: "100%", marginTop: "8px" }}
+          onClick={() => setCart([])}
+        >
+          Kosongkan Keranjang
+        </button>
+      )}
+    </div>
+  );
+
   return (
     <div>
       {error && <div className="alert alert-danger">{error}</div>}
 
+      {/* ── DESKTOP: 2-column layout (unchanged) ── */}
       <div className="pos-layout">
-        {/* ── Panel Produk ── */}
+        {/* Panel Produk */}
         <div className="pos-products">
           <div className="search-wrap">
             <span className="search-icon"><SearchIcon /></span>
@@ -310,174 +402,109 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
             ))}
           </div>
 
-          <div className="product-grid-wrap">
-            <div className="product-grid">
-              {filtered.map((p) => {
-                const inCart = cart.find((i) => i.product_id === p.id);
-                const isOut  = p.stock <= 0;
-                return (
-                  <div
-                    key={p.id}
-                    className={`product-tile ${isOut ? "out" : ""}`}
-                    onClick={() => !isOut && addToCart(p)}
-                  >
-                    {isExpired(p.expired_date) && (
-                      <div style={{ position: "absolute", top: 6, right: 6 }}>
-                        <span className="badge badge-danger" style={{ fontSize: "9px", padding: "2px 6px" }}>Expired</span>
-                      </div>
-                    )}
-                    {inCart && (
-                      <div style={{ position: "absolute", top: 6, left: 6 }}>
-                        <span className="badge badge-blue" style={{ fontSize: "9px", padding: "2px 6px" }}>
-                          {inCart.quantity}×
-                        </span>
-                      </div>
-                    )}
-                    {inCart && inCart.discount_type !== "none" && (
-                      <div style={{ position: "absolute", bottom: 6, right: 6 }}>
-                        <span className="badge badge-warning" style={{ fontSize: "9px", padding: "2px 6px" }}>
-                          🏷️ Diskon
-                        </span>
-                      </div>
-                    )}
-                    <div className="product-tile-cat">{p.category || "Umum"}</div>
-                    <div className="product-tile-name">{p.name}</div>
-                    <div className="product-tile-price">{formatRupiah(p.sell_price)}</div>
-                    <div className="product-tile-stock">{isOut ? "Habis" : `Stok: ${p.stock}`}</div>
-                  </div>
-                );
-              })}
-              {filtered.length === 0 && (
-                <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "40px", color: "var(--text3)" }}>
-                  Produk tidak ditemukan
+          <div className="product-grid">
+            {filtered.map((p) => {
+              const inCart = cart.find((i) => i.product_id === p.id);
+              const isOut  = p.stock <= 0;
+              return (
+                <div
+                  key={p.id}
+                  className={`product-tile ${isOut ? "out" : ""}`}
+                  onClick={() => !isOut && addToCart(p)}
+                >
+                  {isExpired(p.expired_date) && (
+                    <div style={{ position: "absolute", top: 6, right: 6 }}>
+                      <span className="badge badge-danger" style={{ fontSize: "9px", padding: "2px 6px" }}>Expired</span>
+                    </div>
+                  )}
+                  {inCart && (
+                    <div style={{ position: "absolute", top: 6, left: 6 }}>
+                      <span className="badge badge-blue" style={{ fontSize: "9px", padding: "2px 6px" }}>
+                        {inCart.quantity}×
+                      </span>
+                    </div>
+                  )}
+                  {inCart && inCart.discount_type !== "none" && (
+                    <div style={{ position: "absolute", bottom: 6, right: 6 }}>
+                      <span className="badge badge-warning" style={{ fontSize: "9px", padding: "2px 6px" }}>
+                        🏷️ Diskon
+                      </span>
+                    </div>
+                  )}
+                  <div className="product-tile-cat">{p.category || "Umum"}</div>
+                  <div className="product-tile-name">{p.name}</div>
+                  <div className="product-tile-price">{formatRupiah(p.sell_price)}</div>
+                  <div className="product-tile-stock">{isOut ? "Habis" : `Stok: ${p.stock}`}</div>
                 </div>
-              )}
-            </div>
+              );
+            })}
+            {filtered.length === 0 && (
+              <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "40px", color: "var(--text3)" }}>
+                Produk tidak ditemukan
+              </div>
+            )}
           </div>
         </div>
 
-        {/* ── Panel Keranjang ── */}
-        <div className="cart-panel">
+        {/* Panel Keranjang — desktop only */}
+        <div className="cart-panel desktop-cart">
           <div className="cart-header">
             🛒 Keranjang
             {cartCount > 0 && <span className="nav-badge" style={{ marginLeft: "8px" }}>{cartCount}</span>}
           </div>
+          <CartItemsList />
+          <CartFooter />
+        </div>
+      </div>
 
-          {cart.length === 0 ? (
-            <div className="cart-empty">
-              <div style={{ fontSize: "40px" }}>🛒</div>
-              <div style={{ fontWeight: 600 }}>Keranjang kosong</div>
-              <div style={{ fontSize: "13px" }}>Pilih produk di sebelah kiri</div>
-            </div>
-          ) : (
-            <div className="cart-items">
-              {cart.map((item) => {
-                const hasItemDiscount = item.discount_type !== "none" && item.discount_amount > 0;
-                return (
-                  <div key={item.product_id} className="cart-item" style={{ flexDirection: "column", gap: "8px" }}>
-                    {/* Baris atas: nama + kontrol qty */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%" }}>
-                      <div className="cart-item-info">
-                        <div className="cart-item-name">{item.product_name}</div>
-                        <div className="cart-item-price">
-                          {hasItemDiscount ? (
-                            <>
-                              <span style={{ textDecoration: "line-through", color: "var(--text3)" }}>
-                                {formatRupiah(item.sell_price)}
-                              </span>
-                              {" → "}
-                              <strong style={{ color: "var(--primary)" }}>
-                                {formatRupiah(item.final_price)}
-                              </strong>
-                            </>
-                          ) : (
-                            <span>{formatRupiah(item.sell_price)}</span>
-                          )}
-                          {" × "}{item.quantity}{" = "}
-                          <strong>{formatRupiah(item.final_price * item.quantity)}</strong>
-                        </div>
-                      </div>
-                      <div className="cart-qty">
-                        <button className="qty-btn" onClick={() => updateQty(item.product_id, -1)}>−</button>
-                        <div className="qty-val">{item.quantity}</div>
-                        <button className="qty-btn" onClick={() => updateQty(item.product_id, 1)}>+</button>
-                        <button className="btn-icon danger" onClick={() => removeItem(item.product_id)} style={{ padding: "4px" }}>
-                          <TrashIcon size={14} />
-                        </button>
-                      </div>
-                    </div>
+      {/* ── MOBILE: Sticky bottom bar + Bottom Sheet ── */}
 
-                    {/* Baris bawah: badge diskon + tombol edit diskon */}
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
-                      {hasItemDiscount ? (
-                        <span className="badge badge-warning" style={{ fontSize: "11px" }}>
-                          🏷️ Diskon{" "}
-                          {item.discount_type === "percent"
-                            ? `${item.discount_value}%`
-                            : formatRupiah(item.discount_value)}
-                          {" (−"}{formatRupiah(item.discount_amount * item.quantity)}{")"}
-                        </span>
-                      ) : (
-                        <span style={{ fontSize: "11px", color: "var(--text3)" }}>Tidak ada diskon</span>
-                      )}
-                      <button
-                        className="btn btn-ghost btn-sm"
-                        style={{ padding: "4px 10px", fontSize: "12px" }}
-                        onClick={() => setDiscountModal(item)}
-                      >
-                        <EditIcon size={12} /> {hasItemDiscount ? "Ubah" : "Tambah"} Diskon
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+      {/* Sticky bar di bawah layar HP */}
+      <div className="mobile-cart-bar" onClick={() => setSheetOpen(true)}>
+        <div className="mobile-cart-bar-left">
+          <span className="mobile-cart-bar-count">{cartCount}</span>
+          <span className="mobile-cart-bar-label">
+            {cartCount === 0 ? "Keranjang kosong" : `${cartCount} item dipilih`}
+          </span>
+        </div>
+        <div className="mobile-cart-bar-right">
+          <span className="mobile-cart-bar-total">{formatRupiah(totalFinal)}</span>
+          <span className="mobile-cart-bar-arrow">▲ Lihat</span>
+        </div>
+      </div>
 
-          {/* Footer total */}
-          <div className="cart-footer">
-            <div className="cart-total-row">
-              <span className="text-muted">Subtotal Normal</span>
-              <span className="cart-total-val td-mono">{formatRupiah(subtotalNormal)}</span>
-            </div>
-            {hasDiscount && (
-              <div className="cart-total-row">
-                <span style={{ color: "var(--warning)" }}>🏷️ Total Diskon</span>
-                <span className="cart-total-val td-mono" style={{ color: "var(--warning)" }}>
-                  − {formatRupiah(totalDiscount)}
-                </span>
-              </div>
-            )}
-            <div className="cart-total-row">
-              <span className="text-muted">Est. Profit</span>
-              <span className={`cart-total-val td-mono ${estimasiProfit >= 0 ? "text-success" : "text-danger"}`}>
-                {formatRupiah(estimasiProfit)}
-              </span>
-            </div>
-            <div className="cart-total-row big">
-              <span>TOTAL BAYAR</span>
-              <span className="cart-total-val">{formatRupiah(totalFinal)}</span>
-            </div>
+      {/* Bottom Sheet overlay */}
+      {sheetOpen && (
+        <div className="sheet-overlay" onClick={() => setSheetOpen(false)} />
+      )}
 
+      {/* Bottom Sheet panel */}
+      <div className={`bottom-sheet ${sheetOpen ? "open" : ""}`}>
+        {/* Handle bar */}
+        <div className="sheet-handle-wrap" onClick={() => setSheetOpen(!sheetOpen)}>
+          <div className="sheet-handle" />
+          <div className="sheet-header">
+            <span style={{ fontWeight: 700, fontSize: "15px" }}>
+              🛒 Keranjang
+              {cartCount > 0 && <span className="nav-badge" style={{ marginLeft: "8px" }}>{cartCount}</span>}
+            </span>
             <button
-              className="btn btn-success btn-lg"
-              style={{ width: "100%", marginTop: "12px" }}
-              onClick={checkout}
-              disabled={cart.length === 0 || processing}
+              onClick={(e) => { e.stopPropagation(); setSheetOpen(false); }}
+              style={{ background: "none", border: "none", fontSize: "20px", cursor: "pointer", color: "var(--text2)", lineHeight: 1 }}
             >
-              {processing ? "⏳ Memproses..." : "✅ Proses Transaksi"}
+              ✕
             </button>
-
-            {cart.length > 0 && (
-              <button
-                className="btn btn-ghost"
-                style={{ width: "100%", marginTop: "8px" }}
-                onClick={() => setCart([])}
-              >
-                Kosongkan Keranjang
-              </button>
-            )}
           </div>
+        </div>
+
+        {/* Scrollable items */}
+        <div className="sheet-body">
+          <CartItemsList />
+        </div>
+
+        {/* Sticky footer inside sheet */}
+        <div className="sheet-footer">
+          <CartFooter />
         </div>
       </div>
 
@@ -518,8 +545,8 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
                       🏷️ Diskon{" "}
                       {item.discount_type === "percent"
                         ? `${item.discount_value}%`
-                        : formatRupiah(item.discount_value / item.quantity)}
-                      {" → "}{formatRupiah(item.final_price)}/pcs
+                        : formatRupiah(item.discount_value)}
+                      {" (−"}{formatRupiah(item.discount_amount * item.quantity)}{")"}
                     </span>
                   )}
                 </div>
@@ -527,22 +554,15 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
             ))}
 
             <div className="receipt-divider" />
-
             {receipt.total_discount > 0 && (
-              <div style={{ display: "flex", justifyContent: "space-between", color: "var(--warning)", marginBottom: "6px", fontSize: "13px" }}>
-                <span>Total Diskon</span>
-                <span style={{ fontWeight: 700 }}>− {formatRupiah(receipt.total_discount)}</span>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px", color: "var(--warning)" }}>
+                <span>🏷️ Total Diskon</span>
+                <span className="td-mono">− {formatRupiah(receipt.total_discount)}</span>
               </div>
             )}
-
-            <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 700, fontSize: "16px" }}>
-              <span>TOTAL BAYAR</span>
-              <span>{formatRupiah(receipt.total_amount)}</span>
-            </div>
-            <div className="receipt-divider" />
-            <div style={{ display: "flex", justifyContent: "space-between", color: "var(--success)" }}>
-              <span>Profit Transaksi</span>
-              <span style={{ fontWeight: 700 }}>{formatRupiah(receipt.total_profit)}</span>
+            <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: "16px" }}>
+              <span>TOTAL</span>
+              <span className="td-mono">{formatRupiah(receipt.total_amount)}</span>
             </div>
           </div>
         </Modal>
