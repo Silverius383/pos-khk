@@ -29,8 +29,11 @@ export type DiscountType = "none" | "percent" | "nominal";
 
 export interface DiscountInfo {
   type: DiscountType;
-  value: number; // angka diskon: % atau Rp
+  value: number;
 }
+
+// ─── Payment ──────────────────────────────────────────────────────────────────
+export type PaymentMethod = "tunai" | "transfer" | "qris";
 
 // ─── Transaction ─────────────────────────────────────────────────────────────
 export interface TransactionItem {
@@ -39,21 +42,22 @@ export interface TransactionItem {
   product_id: string;
   product_name: string;
   quantity: number;
-  sell_price: number;      // harga normal
+  sell_price: number;
   buy_price: number;
   discount_type: DiscountType;
-  discount_value: number;  // angka diskon (% atau Rp)
-  discount_amount: number; // nilai diskon dalam Rp
-  final_price: number;     // harga setelah diskon per unit
-  subtotal: number;        // final_price * qty
+  discount_value: number;
+  discount_amount: number;
+  final_price: number;
+  subtotal: number;
   profit: number;
 }
 
 export interface Transaction {
   id: string;
-  total_amount: number;    // total setelah diskon
-  total_discount: number;  // total nilai diskon
+  total_amount: number;
+  total_discount: number;
   total_profit: number;
+  payment_method: PaymentMethod;
   created_at: string;
   items: TransactionItem[];
 }
@@ -77,14 +81,14 @@ export interface ExpenseFormData {
 export interface CartItem {
   product_id: string;
   product_name: string;
-  sell_price: number;      // harga normal
+  sell_price: number;
   buy_price: number;
   quantity: number;
   max_qty: number;
   discount_type: DiscountType;
-  discount_value: number;  // angka diskon (% atau Rp)
-  discount_amount: number; // nilai diskon per unit dalam Rp
-  final_price: number;     // harga setelah diskon per unit
+  discount_value: number;
+  discount_amount: number;
+  final_price: number;
 }
 
 // ─── API Response ─────────────────────────────────────────────────────────────

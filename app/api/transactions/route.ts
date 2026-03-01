@@ -12,8 +12,8 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const dateFrom = searchParams.get("from");
-    const dateTo = searchParams.get("to");
-    const limit = parseInt(searchParams.get("limit") || "50");
+    const dateTo   = searchParams.get("to");
+    const limit    = parseInt(searchParams.get("limit") || "50");
 
     const where: Record<string, unknown> = {};
     if (dateFrom || dateTo) {
@@ -36,7 +36,6 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/transactions — ATOMIC dengan dukungan diskon
 export async function POST(request: NextRequest) {
   if (!(await requireAuth())) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
@@ -44,16 +43,18 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { items } = body;
-    // items: Array<{ product_id, quantity, discount_type, discount_value }>
+    const { items, payment_method } = body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ success: false, error: "Keranjang belanja kosong" }, { status: 400 });
     }
 
+    const validMethods = ["tunai", "transfer", "qris"];
+    const method = validMethods.includes(payment_method) ? payment_method : "tunai";
+
     const transaction = await prisma.$transaction(async (tx) => {
       const productIds = items.map((i: { product_id: string }) => i.product_id);
-      const products = await tx.product.findMany({ where: { id: { in: productIds } } });
+      const products   = await tx.product.findMany({ where: { id: { in: productIds } } });
       const productMap = new Map(products.map((p) => [p.id, p]));
 
       let totalAmount   = 0;
@@ -68,16 +69,13 @@ export async function POST(request: NextRequest) {
           throw new Error(`Stok ${product.name} tidak cukup. Tersedia: ${product.stock}`);
         }
 
-        const discountType  = item.discount_type  || "none";
-        const discountValue = item.discount_value || 0;
-
-        // Hitung diskon per unit
+        const discountType    = item.discount_type  || "none";
+        const discountValue   = item.discount_value || 0;
         const discountPerUnit = calculateDiscountAmount(product.sell_price, discountType, discountValue);
         const finalPrice      = calculateFinalPrice(product.sell_price, discountType, discountValue);
-
-        const discountAmount = discountPerUnit * item.quantity; // total diskon item
-        const subtotal       = finalPrice * item.quantity;
-        const profit         = (finalPrice - product.buy_price) * item.quantity;
+        const discountAmount  = discountPerUnit * item.quantity;
+        const subtotal        = finalPrice * item.quantity;
+        const profit          = (finalPrice - product.buy_price) * item.quantity;
 
         totalAmount   += subtotal;
         totalDiscount += discountAmount;
@@ -87,14 +85,14 @@ export async function POST(request: NextRequest) {
           product_id:      product.id,
           product_name:    product.name,
           quantity:        item.quantity,
-          sell_price:      product.sell_price, // snapshot harga normal
-          buy_price:       product.buy_price,  // snapshot
+          sell_price:      product.sell_price,
+          buy_price:       product.buy_price,
           discount_type:   discountType,
           discount_value:  discountValue,
           discount_amount: discountAmount,
           final_price:     finalPrice,
-          subtotal:        subtotal,
-          profit:          profit,
+          subtotal,
+          profit,
         });
       }
 
@@ -103,12 +101,12 @@ export async function POST(request: NextRequest) {
           total_amount:   totalAmount,
           total_discount: totalDiscount,
           total_profit:   totalProfit,
+          payment_method: method,
           items: { create: itemsData },
         },
         include: { items: true },
       });
 
-      // Kurangi stok
       await Promise.all(
         items.map((item: { product_id: string; quantity: number }) =>
           tx.product.update({
