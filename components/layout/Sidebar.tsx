@@ -5,15 +5,16 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   SnowflakeIcon, DashboardIcon, CartIcon, ProductIcon,
-  ExpenseIcon, ReportIcon, LogoutIcon,
+  ExpenseIcon, ReportIcon, LogoutIcon, RestockIcon,
 } from "@/components/ui/Icons";
 
 const NAV_ITEMS = [
-  { href: "/dashboard",     label: "Dashboard",     Icon: DashboardIcon },
-  { href: "/transactions",  label: "Kasir / POS",   Icon: CartIcon },
-  { href: "/products",      label: "Produk",        Icon: ProductIcon },
-  { href: "/expenses",      label: "Pengeluaran",   Icon: ExpenseIcon },
-  { href: "/reports",       label: "Laporan",       Icon: ReportIcon },
+  { href: "/dashboard",    label: "Dashboard",       Icon: DashboardIcon },
+  { href: "/transactions", label: "Kasir / POS",     Icon: CartIcon },
+  { href: "/products",     label: "Produk",          Icon: ProductIcon },
+  { href: "/restock",      label: "Restock Produk",      Icon: RestockIcon },
+  { href: "/expenses",     label: "Pengeluaran",     Icon: ExpenseIcon },
+  { href: "/reports",      label: "Laporan",         Icon: ReportIcon },
 ];
 
 interface SidebarProps {
@@ -24,7 +25,7 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen, onClose, lowStockCount = 0 }: SidebarProps) {
   const pathname = usePathname();
-  const router = useRouter();
+  const router   = useRouter();
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" });
@@ -33,53 +34,40 @@ export default function Sidebar({ isOpen, onClose, lowStockCount = 0 }: SidebarP
   };
 
   const now = new Date().toLocaleDateString("id-ID", {
-    weekday: "short",
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
+    weekday: "short", day: "2-digit", month: "short", year: "numeric",
   });
 
   return (
     <>
-      {/* Mobile overlay */}
-      {isOpen && (
-        <div className="overlay-backdrop" style={{ zIndex: 150 }} onClick={onClose} />
-      )}
+      {isOpen && <div className="overlay-backdrop" style={{ zIndex: 150 }} onClick={onClose} />}
 
       <aside className={`sidebar ${isOpen ? "open" : ""}`}>
-        {/* Logo */}
         <div className="sidebar-logo">
-          <div className="sidebar-logo-icon">
-            <SnowflakeIcon size={26} />
-          </div>
+          <div className="sidebar-logo-icon"><SnowflakeIcon size={26} /></div>
           <div>
             <div className="sidebar-logo-text">KHK Frozen Food</div>
             <div className="sidebar-logo-sub">POS System</div>
           </div>
         </div>
 
-        {/* Navigation */}
         <nav className="sidebar-nav">
           {NAV_ITEMS.map(({ href, label, Icon }) => {
             const isActive = pathname === href || pathname.startsWith(href + "/");
             return (
-              <Link
-                key={href}
-                href={href}
-                className={`nav-item ${isActive ? "active" : ""}`}
-                onClick={onClose}
-              >
+              <Link key={href} href={href} className={`nav-item ${isActive ? "active" : ""}`} onClick={onClose}>
                 <Icon size={20} />
                 <span className="nav-item-label">{label}</span>
                 {href === "/products" && lowStockCount > 0 && (
                   <span className="nav-badge">{lowStockCount}</span>
+                )}
+                {href === "/restock" && lowStockCount > 0 && (
+                  <span className="nav-badge" style={{ background: "#F59E0B" }}>{lowStockCount}</span>
                 )}
               </Link>
             );
           })}
         </nav>
 
-        {/* Bottom */}
         <div className="sidebar-bottom">
           <div className="sidebar-date">{now}</div>
           <button className="nav-item" onClick={handleLogout}>

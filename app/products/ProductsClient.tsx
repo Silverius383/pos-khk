@@ -23,6 +23,7 @@ const CATEGORIES = [
   "French Fries",
   "Belfoods Nugget",
   "Champ Nugget",
+  "Fiesta Nugget",
   "Kanzler Nugget",
   "So Good Nugget",
   "Sosis",
