@@ -6,6 +6,116 @@ import { Product, Transaction } from "@/types";
 import { formatRupiah } from "@/utils/currency";
 import { formatDateTime, isExpired } from "@/utils/date";
 import { WarningIcon, SearchIcon } from "@/components/ui/Icons";
+import Modal from "@/components/ui/Modal";
+
+// ── Payment helpers ────────────────────────────────────────────────────────────
+const PAYMENT_INFO: Record<string, { icon: string; label: string; color: string }> = {
+  tunai:    { icon: "💵", label: "Tunai",    color: "#057A55" },
+  transfer: { icon: "🏦", label: "Transfer", color: "#1C64F2" },
+  qris:     { icon: "📱", label: "QRIS",     color: "#7C3AED" },
+};
+
+function PaymentBadge({ method }: { method: string }) {
+  const p = PAYMENT_INFO[method] ?? PAYMENT_INFO.tunai;
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: "4px",
+      padding: "2px 8px", borderRadius: "99px", fontSize: "11px", fontWeight: 700,
+      background: `${p.color}18`, color: p.color, border: `1px solid ${p.color}30`,
+    }}>
+      {p.icon} {p.label}
+    </span>
+  );
+}
+
+function TxDetailModal({ tx, onClose }: { tx: Transaction; onClose: () => void }) {
+  const cashChange = tx.payment_method === "tunai" && tx.cash_received
+    ? tx.cash_received - tx.total_amount
+    : null;
+
+  return (
+    <Modal
+      title="🧾 Detail Transaksi"
+      onClose={onClose}
+      footer={<button className="btn btn-primary" onClick={onClose}>Tutup</button>}
+    >
+      <div className="receipt">
+        <div style={{ textAlign: "center", marginBottom: "12px" }}>
+          <div style={{ fontWeight: 700, fontSize: "15px" }}>KHK FROZEN FOOD</div>
+          <div style={{ color: "var(--text3)", fontSize: "12px" }}>{formatDateTime(tx.created_at)}</div>
+          <div style={{ color: "var(--text3)", fontSize: "11px", marginTop: "2px" }}>ID: {tx.id.slice(0, 8)}...</div>
+        </div>
+        <div className="receipt-divider" />
+
+        {(tx.items || []).map((item) => (
+          <div key={item.id} style={{ marginBottom: "10px", fontSize: "13px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span style={{ fontWeight: 600 }}>{item.product_name}</span>
+              <span style={{ fontWeight: 700 }}>{formatRupiah(item.subtotal)}</span>
+            </div>
+            <div style={{ fontSize: "12px", color: "var(--text3)", marginTop: "2px" }}>
+              {item.quantity} pcs × {formatRupiah(item.sell_price)}
+              {item.discount_type !== "none" && item.discount_amount > 0 && (
+                <span style={{ color: "var(--warning)", marginLeft: "8px" }}>
+                  🏷️ Diskon {item.discount_type === "percent"
+                    ? `${item.discount_value}%`
+                    : formatRupiah(item.discount_value)}
+                  {" → "}{formatRupiah(item.final_price)}/pcs
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+
+        <div className="receipt-divider" />
+
+        {tx.total_discount > 0 && (
+          <div style={{ display: "flex", justifyContent: "space-between", color: "var(--warning)", marginBottom: "6px", fontSize: "13px" }}>
+            <span>Total Diskon</span>
+            <span style={{ fontWeight: 700 }}>− {formatRupiah(tx.total_discount)}</span>
+          </div>
+        )}
+        <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: "16px", marginBottom: "8px" }}>
+          <span>TOTAL BAYAR</span>
+          <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>{formatRupiah(tx.total_amount)}</span>
+        </div>
+
+        <div className="receipt-divider" />
+
+        <div style={{ fontSize: "13px", display: "flex", flexDirection: "column", gap: "6px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <span style={{ color: "var(--text2)" }}>Metode Pembayaran</span>
+            <PaymentBadge method={tx.payment_method} />
+          </div>
+          {tx.payment_method === "tunai" && tx.cash_received && (
+            <>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span style={{ color: "var(--text2)" }}>Uang Diterima</span>
+                <span style={{ fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>
+                  {formatRupiah(tx.cash_received)}
+                </span>
+              </div>
+              {cashChange !== null && (
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span style={{ color: "var(--text2)" }}>Kembalian</span>
+                  <span style={{ fontWeight: 800, fontFamily: "'JetBrains Mono', monospace", color: "var(--success)" }}>
+                    {formatRupiah(Math.abs(cashChange))}
+                  </span>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="receipt-divider" />
+        <div style={{ display: "flex", justifyContent: "space-between", color: "var(--success)", fontSize: "13px" }}>
+          <span>Profit Transaksi</span>
+          <span style={{ fontWeight: 700, fontFamily: "'JetBrains Mono', monospace" }}>{formatRupiah(tx.total_profit)}</span>
+        </div>
+      </div>
+    </Modal>
+  );
+}
 
 interface DashboardClientProps {
   stats: {
@@ -21,10 +131,11 @@ interface DashboardClientProps {
 }
 
 export default function DashboardClient({ stats, lowStockProducts, recentTransactions }: DashboardClientProps) {
-  const expiredProds = lowStockProducts.filter((p) => isExpired(p.expired_date));
+  const [viewTx, setViewTx]                 = useState<Transaction | null>(null);
+  const [stockSearch, setStockSearch]       = useState("");
+  const [stockCatFilter, setStockCatFilter] = useState("Semua");
 
-  const [stockSearch, setStockSearch] = useState("");
-  const [stockCat, setStockCat] = useState("Semua");
+  const expiredProds = lowStockProducts.filter((p) => isExpired(p.expired_date));
 
   const stockCategories = useMemo(
     () => ["Semua", ...Array.from(new Set(lowStockProducts.map((p) => p.category).filter(Boolean)))],
@@ -32,19 +143,17 @@ export default function DashboardClient({ stats, lowStockProducts, recentTransac
   );
 
   const filteredLowStock = useMemo(
-    () =>
-      lowStockProducts.filter((p) => {
-        const matchSearch =
-          p.name.toLowerCase().includes(stockSearch.toLowerCase()) ||
-          (p.category || "").toLowerCase().includes(stockSearch.toLowerCase());
-        const matchCat = stockCat === "Semua" || p.category === stockCat;
-        return matchSearch && matchCat;
-      }),
-    [lowStockProducts, stockSearch, stockCat]
+    () => lowStockProducts.filter((p) => {
+      const mc = stockCatFilter === "Semua" || p.category === stockCatFilter;
+      const ms = p.name.toLowerCase().includes(stockSearch.toLowerCase());
+      return mc && ms;
+    }),
+    [lowStockProducts, stockSearch, stockCatFilter]
   );
 
   return (
     <div>
+      {/* Alerts */}
       {(expiredProds.length > 0 || lowStockProducts.length > 0) && (
         <div style={{ marginBottom: "20px", display: "flex", flexDirection: "column", gap: "8px" }}>
           {expiredProds.length > 0 && (
@@ -62,6 +171,7 @@ export default function DashboardClient({ stats, lowStockProducts, recentTransac
         </div>
       )}
 
+      {/* Stats */}
       <div className="stats-grid">
         <div className="stat-card blue">
           <div className="stat-label">Penjualan Hari Ini</div>
@@ -86,121 +196,100 @@ export default function DashboardClient({ stats, lowStockProducts, recentTransac
       </div>
 
       <div className="grid-2">
+        {/* Low Stock */}
         <div className="card">
-          <div className="card-header">
-            <div className="card-title">⚠️ Stok Hampir Habis</div>
-            {lowStockProducts.length > 0 && (
-              <span className="badge badge-warning">{lowStockProducts.length} produk</span>
-            )}
-          </div>
-
-          {lowStockProducts.length > 0 && (
-            <div style={{ padding: "10px 16px", borderBottom: "1px solid var(--border)", display: "flex", flexDirection: "column", gap: "8px" }}>
-              <div className="search-wrap" style={{ marginBottom: 0 }}>
-                <span className="search-icon"><SearchIcon /></span>
-                <input
-                  className="form-input"
-                  style={{ fontSize: "13px", padding: "7px 10px 7px 36px" }}
-                  placeholder="Cari produk..."
-                  value={stockSearch}
-                  onChange={(e) => setStockSearch(e.target.value)}
-                />
-              </div>
-              {stockCategories.length > 2 && (
-                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                  {stockCategories.map((c) => (
-                    <button
-                      key={c}
-                      onClick={() => setStockCat(c)}
-                      style={{
-                        padding: "3px 10px",
-                        borderRadius: "99px",
-                        fontSize: "11px",
-                        fontWeight: 600,
-                        border: "1px solid",
-                        cursor: "pointer",
-                        fontFamily: "inherit",
-                        transition: "all 0.15s",
-                        background: stockCat === c ? "var(--warning-light)" : "var(--surface2)",
-                        borderColor: stockCat === c ? "#FCD34D" : "var(--border)",
-                        color: stockCat === c ? "var(--warning)" : "var(--text2)",
-                      }}
-                    >
-                      {c}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="dashboard-card-scroll">
+          <div className="card-header"><div className="card-title">⚠️ Stok Hampir Habis</div></div>
+          <div style={{ padding: 0 }}>
             {lowStockProducts.length === 0 ? (
               <div style={{ padding: "24px", textAlign: "center", color: "var(--text3)" }}>Semua stok aman ✅</div>
-            ) : filteredLowStock.length === 0 ? (
-              <div style={{ padding: "24px", textAlign: "center", color: "var(--text3)" }}>Produk tidak ditemukan 🔍</div>
             ) : (
-              <div className="table-wrap">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Produk</th>
-                      <th>Stok</th>
-                      <th>Min</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredLowStock.map((p) => (
-                      <tr key={p.id}>
-                        <td style={{ fontWeight: 600 }}>
-                          {p.name}
-                          {isExpired(p.expired_date) && (
-                            <span className="badge badge-danger" style={{ marginLeft: "8px", fontSize: "10px" }}>Expired</span>
-                          )}
-                        </td>
-                        <td>
-                          <span className={`badge ${p.stock === 0 ? "badge-danger" : "badge-warning"}`}>{p.stock}</span>
-                        </td>
-                        <td className="text-muted">{p.min_stock}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+              <>
+                {/* Search + category filter */}
+                <div style={{ padding: "10px 12px", borderBottom: "1px solid var(--border)" }}>
+                  <div className="search-wrap" style={{ marginBottom: stockCategories.length > 2 ? "8px" : "0" }}>
+                    <span className="search-icon"><SearchIcon size={15} /></span>
+                    <input
+                      className="form-input"
+                      placeholder="Cari produk..."
+                      value={stockSearch}
+                      onChange={(e) => setStockSearch(e.target.value)}
+                      style={{ fontSize: "13px", padding: "7px 10px 7px 34px" }}
+                    />
+                  </div>
+                  {stockCategories.length > 2 && (
+                    <div className="filter-bar" style={{ gap: "6px", marginBottom: 0 }}>
+                      {stockCategories.map((c) => (
+                        <button
+                          key={c}
+                          className={`tag ${stockCatFilter === c ? "active" : ""}`}
+                          style={{ fontSize: "11px", padding: "3px 10px" }}
+                          onClick={() => setStockCatFilter(c)}
+                        >
+                          {c}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="table-wrap dashboard-card-scroll">
+                  <table>
+                    <thead><tr><th>Produk</th><th>Stok</th><th>Min</th></tr></thead>
+                    <tbody>
+                      {filteredLowStock.length === 0 ? (
+                        <tr>
+                          <td colSpan={3} style={{ textAlign: "center", padding: "20px", color: "var(--text3)", fontSize: "13px" }}>
+                            Tidak ditemukan
+                          </td>
+                        </tr>
+                      ) : filteredLowStock.map((p) => (
+                        <tr key={p.id}>
+                          <td style={{ fontWeight: 600 }}>
+                            {p.name}
+                            {isExpired(p.expired_date) && (
+                              <span className="badge badge-danger" style={{ marginLeft: "8px", fontSize: "10px" }}>Expired</span>
+                            )}
+                          </td>
+                          <td>
+                            <span className={`badge ${p.stock === 0 ? "badge-danger" : "badge-warning"}`}>{p.stock}</span>
+                          </td>
+                          <td className="text-muted">{p.min_stock}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
           </div>
         </div>
 
+        {/* Recent Transactions */}
         <div className="card">
-          <div className="card-header">
-            <div className="card-title">🧾 Transaksi Terakhir</div>
-            {recentTransactions.length > 0 && (
-              <span className="badge badge-blue">{recentTransactions.length}</span>
-            )}
-          </div>
-          <div className="dashboard-card-scroll">
+          <div className="card-header"><div className="card-title">🧾 Transaksi Terakhir</div></div>
+          <div style={{ padding: 0 }}>
             {recentTransactions.length === 0 ? (
               <div style={{ padding: "24px", textAlign: "center", color: "var(--text3)" }}>Belum ada transaksi</div>
             ) : (
-              <div className="table-wrap">
+              <div className="table-wrap dashboard-card-scroll">
                 <table>
                   <thead>
                     <tr>
                       <th>Waktu</th>
-                      <th>Diskon</th>
+                      <th>Bayar</th>
                       <th>Total</th>
-                      <th>Profit</th>
+                      <th></th>
                     </tr>
                   </thead>
                   <tbody>
                     {recentTransactions.map((t) => (
                       <tr key={t.id}>
                         <td className="text-muted" style={{ fontSize: "12px" }}>{formatDateTime(t.created_at)}</td>
-                        <td className="td-mono" style={{ color: t.total_discount > 0 ? "var(--warning)" : "var(--text3)", fontSize: "12px" }}>
-                          {t.total_discount > 0 ? `−${formatRupiah(t.total_discount)}` : "—"}
+                        <td><PaymentBadge method={t.payment_method} /></td>
+                        <td className="td-mono" style={{ fontWeight: 700 }}>{formatRupiah(t.total_amount)}</td>
+                        <td>
+                          <button className="btn btn-ghost btn-sm" onClick={() => setViewTx(t)}>Detail</button>
                         </td>
-                        <td className="td-mono">{formatRupiah(t.total_amount)}</td>
-                        <td className="td-mono text-success">{formatRupiah(t.total_profit)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -210,6 +299,8 @@ export default function DashboardClient({ stats, lowStockProducts, recentTransac
           </div>
         </div>
       </div>
+
+      {viewTx && <TxDetailModal tx={viewTx} onClose={() => setViewTx(null)} />}
     </div>
   );
 }

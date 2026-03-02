@@ -1,6 +1,5 @@
 // types/index.ts
 
-// ─── Product ──────────────────────────────────────────────────────────────────
 export interface Product {
   id: string;
   name: string;
@@ -24,7 +23,6 @@ export interface ProductFormData {
   expired_date: string;
 }
 
-// ─── Discount ─────────────────────────────────────────────────────────────────
 export type DiscountType = "none" | "percent" | "nominal";
 
 export interface DiscountInfo {
@@ -32,10 +30,8 @@ export interface DiscountInfo {
   value: number;
 }
 
-// ─── Payment ──────────────────────────────────────────────────────────────────
 export type PaymentMethod = "tunai" | "transfer" | "qris";
 
-// ─── Transaction ─────────────────────────────────────────────────────────────
 export interface TransactionItem {
   id: string;
   transaction_id: string;
@@ -58,11 +54,11 @@ export interface Transaction {
   total_discount: number;
   total_profit: number;
   payment_method: PaymentMethod;
+  cash_received: number | null;
   created_at: string;
   items: TransactionItem[];
 }
 
-// ─── Expense ─────────────────────────────────────────────────────────────────
 export interface Expense {
   id: string;
   name: string;
@@ -77,7 +73,6 @@ export interface ExpenseFormData {
   category: string;
 }
 
-// ─── Cart ─────────────────────────────────────────────────────────────────────
 export interface CartItem {
   product_id: string;
   product_name: string;
@@ -91,7 +86,6 @@ export interface CartItem {
   final_price: number;
 }
 
-// ─── API Response ─────────────────────────────────────────────────────────────
 export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;

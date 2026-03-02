@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { items, payment_method } = body;
+    const { items, payment_method, cash_received } = body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ success: false, error: "Keranjang belanja kosong" }, { status: 400 });
@@ -102,6 +102,7 @@ export async function POST(request: NextRequest) {
           total_discount: totalDiscount,
           total_profit:   totalProfit,
           payment_method: method,
+          cash_received:  method === "tunai" && cash_received > 0 ? cash_received : null,
           items: { create: itemsData },
         },
         include: { items: true },

@@ -32,7 +32,8 @@ model Transaction {
   total_amount   Int
   total_discount Int      @default(0)
   total_profit   Int
-  payment_method String   @default("tunai") // "tunai" | "transfer" | "qris"
+  payment_method String   @default("tunai")   // "tunai" | "transfer" | "qris"
+  cash_received  Int?                          // uang diterima (tunai), null jika transfer/qris
   created_at     DateTime @default(now())
 
   items TransactionItem[]

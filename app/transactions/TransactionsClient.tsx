@@ -108,7 +108,7 @@ function PaymentModal({
   totalFinal, onConfirm, onClose, processing,
 }: {
   totalFinal: number;
-  onConfirm: (method: PaymentMethod) => void;
+  onConfirm: (method: PaymentMethod, cashReceived?: number) => void;
   onClose: () => void;
   processing: boolean;
 }) {
@@ -133,7 +133,7 @@ function PaymentModal({
           <button className="btn btn-ghost" onClick={onClose} disabled={processing}>Batal</button>
           <button
             className="btn btn-success"
-            onClick={() => onConfirm(selected)}
+            onClick={() => onConfirm(selected, selected === "tunai" && cashAmount > 0 ? cashAmount : undefined)}
             disabled={processing || !isValidCash}
           >
             {processing ? "⏳ Memproses..." : "✅ Konfirmasi"}
@@ -318,7 +318,7 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
   const cartCount      = cart.reduce((s, i) => s + i.quantity, 0);
   const hasDiscount    = cart.some((i) => i.discount_type !== "none" && i.discount_amount > 0);
 
-  const checkout = async (method: PaymentMethod) => {
+  const checkout = async (method: PaymentMethod, cashReceived?: number) => {
     if (cart.length === 0) return;
     setProcessing(true);
     setError("");
@@ -330,6 +330,7 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
         credentials: "include",
         body: JSON.stringify({
           payment_method: method,
+          cash_received: method === "tunai" && cashReceived ? cashReceived : null,
           items: cart.map((i) => ({
             product_id:     i.product_id,
             quantity:       i.quantity,
