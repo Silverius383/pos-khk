@@ -43,7 +43,7 @@ const CATEGORIES = [
   "Home Made Olahan Ayam",
   "Home Made Risoles",
   "Home Made Jajanan",
-  "Home Made Cireng",
+  "Home Made Cireng, Sempol",
   "Edamame",
   "Kebab",
   "Minipao & Donat",
