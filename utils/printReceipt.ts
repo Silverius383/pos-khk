@@ -105,8 +105,7 @@ export function buildReceiptString(tx: Transaction): string {
 
   s += divider();
   s += E.ALIGN_CENTER;
-  s += "Terima kasih sudah berbelanja!" + E.LF;
-  s += "KHK Frozen Food" + E.LF;
+  s += "Terima kasih sudah berbelanja di KHK Frozen Food" + E.LF;
   s += E.ALIGN_LEFT;
   s += E.FEED_3 + E.CUT;
 
