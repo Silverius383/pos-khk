@@ -67,6 +67,7 @@ export function buildReceiptString(tx: Transaction): string {
 
   // Header
   s += E.BOLD_ON + E.DOUBLE_ON + center("KHK FROZEN FOOD") + E.DOUBLE_OFF + E.BOLD_OFF;
+  s += E.FONT_SMALL + center("Jl. Cempaka No.108, Salakan") + center("Mertoyudan, Magelang 56172") + E.FONT_NORMAL;
   s += center("Struk Pembelian");
   s += center(formatDate(tx.created_at));
   s += divider();
