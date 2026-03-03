@@ -8,6 +8,7 @@ import { formatRupiah, calculateDiscountAmount, calculateFinalPrice } from "@/ut
 import { formatDateTime, isExpired } from "@/utils/date";
 import Modal from "@/components/ui/Modal";
 import { SearchIcon, TrashIcon, EditIcon } from "@/components/ui/Icons";
+import { printViaRawBT } from "@/utils/printReceipt";
 
 interface TransactionsClientProps {
   initialProducts: Product[];
@@ -572,7 +573,14 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
       {/* ── Modal Struk ── */}
       {receipt && (
         <Modal title="✅ Transaksi Berhasil!" onClose={() => setReceipt(null)}
-          footer={<button className="btn btn-primary" onClick={() => setReceipt(null)}>Selesai</button>}>
+          footer={
+            <div style={{ display: "flex", gap: "8px", width: "100%", justifyContent: "flex-end" }}>
+              <button className="btn btn-ghost" onClick={() => printViaRawBT(receipt)}>
+                🖨️ Cetak Struk
+              </button>
+              <button className="btn btn-primary" onClick={() => setReceipt(null)}>Selesai</button>
+            </div>
+          }>
           <div className="receipt">
             <div style={{ textAlign: "center", marginBottom: "16px" }}>
               <div style={{ fontSize: "36px" }}>🧾</div>

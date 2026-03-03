@@ -6,6 +6,7 @@ import { Transaction, Expense } from "@/types";
 import { formatRupiah } from "@/utils/currency";
 import { formatDateTime } from "@/utils/date";
 import Modal from "@/components/ui/Modal";
+import { printViaRawBT } from "@/utils/printReceipt";
 import { DownloadIcon } from "@/components/ui/Icons";
 
 // ── Payment helpers ────────────────────────────────────────────────────────────
@@ -237,7 +238,12 @@ export default function ReportsClient({
         <Modal
           title="Detail Transaksi"
           onClose={() => setViewTx(null)}
-          footer={<button className="btn btn-primary" onClick={() => setViewTx(null)}>Tutup</button>}
+          footer={
+            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", width: "100%" }}>
+              <button className="btn btn-ghost" onClick={() => printViaRawBT(viewTx)}>🖨️ Cetak Struk</button>
+              <button className="btn btn-primary" onClick={() => setViewTx(null)}>Tutup</button>
+            </div>
+          }
         >
           <div className="receipt">
             {/* Header */}

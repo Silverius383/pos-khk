@@ -7,6 +7,7 @@ import { formatRupiah } from "@/utils/currency";
 import { formatDateTime, isExpired } from "@/utils/date";
 import { WarningIcon, SearchIcon } from "@/components/ui/Icons";
 import Modal from "@/components/ui/Modal";
+import { printViaRawBT } from "@/utils/printReceipt";
 
 // ── Payment helpers ────────────────────────────────────────────────────────────
 const PAYMENT_INFO: Record<string, { icon: string; label: string; color: string }> = {
@@ -37,7 +38,12 @@ function TxDetailModal({ tx, onClose }: { tx: Transaction; onClose: () => void }
     <Modal
       title="🧾 Detail Transaksi"
       onClose={onClose}
-      footer={<button className="btn btn-primary" onClick={onClose}>Tutup</button>}
+      footer={
+            <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", width: "100%" }}>
+              <button className="btn btn-ghost" onClick={() => printViaRawBT(tx)}>🖨️ Cetak Struk</button>
+              <button className="btn btn-primary" onClick={onClose}>Tutup</button>
+            </div>
+          }
     >
       <div className="receipt">
         <div style={{ textAlign: "center", marginBottom: "12px" }}>
