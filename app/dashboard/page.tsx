@@ -6,23 +6,15 @@ import { prisma } from "@/lib/prisma";
 import AppLayout from "@/components/layout/AppLayout";
 import DashboardClient from "./DashboardClient";
 
+const STOCK_PURCHASE_CATEGORY = "Pembelian Stok";
+
 export default async function DashboardPage() {
   const session = await getSession();
   if (!session.isLoggedIn) redirect("/login");
 
-  const now = new Date();
-
-  const todayStart = new Date(Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    now.getUTCDate()
-  ));
-
-  const monthStart = new Date(Date.UTC(
-    now.getUTCFullYear(),
-    now.getUTCMonth(),
-    1
-  ));
+  const now        = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
   try {
     const [todayTx, monthTx, todayExp, monthExp, recentTransactions, allProducts] =
@@ -37,24 +29,33 @@ export default async function DashboardPage() {
           take: 8,
         }),
         prisma.product.findMany({
-          where: { deleted_at: null }, // 👈 exclude soft-deleted
+          where: { deleted_at: null },
           orderBy: { stock: "asc" },
         }),
       ]);
 
     const lowStockProducts = allProducts.filter((p) => p.stock <= p.min_stock);
 
+    // Pisahkan pengeluaran: operasional vs pembelian stok
+    const todayOpex         = todayExp.filter((e) => e.category !== STOCK_PURCHASE_CATEGORY).reduce((s, e) => s + e.amount, 0);
+    const todayStockPurchase = todayExp.filter((e) => e.category === STOCK_PURCHASE_CATEGORY).reduce((s, e) => s + e.amount, 0);
+
+    const monthOpex          = monthExp.filter((e) => e.category !== STOCK_PURCHASE_CATEGORY).reduce((s, e) => s + e.amount, 0);
+    const monthStockPurchase = monthExp.filter((e) => e.category === STOCK_PURCHASE_CATEGORY).reduce((s, e) => s + e.amount, 0);
+
+    const todayGross  = todayTx.reduce((s, t) => s + t.total_profit, 0);
+    const monthGross  = monthTx.reduce((s, t) => s + t.total_profit, 0);
+
     const stats = {
-      today_sales: todayTx.reduce((s, t) => s + t.total_amount, 0),
-      today_profit:
-        todayTx.reduce((s, t) => s + t.total_profit, 0) -
-        todayExp.reduce((s, e) => s + e.amount, 0),
-      today_tx_count: todayTx.length,
-      month_sales: monthTx.reduce((s, t) => s + t.total_amount, 0),
-      month_profit:
-        monthTx.reduce((s, t) => s + t.total_profit, 0) -
-        monthExp.reduce((s, e) => s + e.amount, 0),
-      month_tx_count: monthTx.length,
+      today_sales:              todayTx.reduce((s, t) => s + t.total_amount, 0),
+      today_profit:             todayGross - todayOpex,
+      today_tx_count:           todayTx.length,
+      month_sales:              monthTx.reduce((s, t) => s + t.total_amount, 0),
+      month_profit:             monthGross - monthOpex,             // profit operasional (exclude pembelian stok)
+      month_profit_after_stock: monthGross - monthOpex - monthStockPurchase, // setelah semua pengeluaran
+      month_tx_count:           monthTx.length,
+      month_opex:               monthOpex,
+      month_stock_purchase:     monthStockPurchase,
     };
 
     return (

@@ -65,8 +65,12 @@ export default function ReportsClient({
   const totalSales    = useMemo(() => transactions.reduce((s, t) => s + t.total_amount, 0), [transactions]);
   const totalDiscount = useMemo(() => transactions.reduce((s, t) => s + t.total_discount, 0), [transactions]);
   const grossProfit   = useMemo(() => transactions.reduce((s, t) => s + t.total_profit, 0), [transactions]);
-  const totalExpenses = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
-  const netProfit     = grossProfit - totalExpenses;
+  const STOCK_CAT = "Pembelian Stok";
+  const totalOpex          = useMemo(() => expenses.filter((e) => e.category !== STOCK_CAT).reduce((s, e) => s + e.amount, 0), [expenses]);
+  const totalStockPurchase = useMemo(() => expenses.filter((e) => e.category === STOCK_CAT).reduce((s, e) => s + e.amount, 0), [expenses]);
+  const totalExpenses      = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
+  const netProfit          = grossProfit - totalOpex;           // profit operasional
+  const netProfitAfterStock = grossProfit - totalExpenses;      // profit setelah modal stok
 
   // Payment method breakdown
   const paymentBreakdown = useMemo(() => {
@@ -120,14 +124,41 @@ export default function ReportsClient({
           <div className="stat-value">{formatRupiah(grossProfit)}</div>
           <div className="stat-sub">Sebelum biaya operasional</div>
         </div>
-        <div className="stat-card purple">
-          <div className="stat-label">Profit Bersih</div>
+        <div className="stat-card green">
+          <div className="stat-label">Profit Operasional</div>
           <div className="stat-value" style={{ color: netProfit >= 0 ? undefined : "var(--danger)" }}>
             {formatRupiah(netProfit)}
           </div>
-          <div className="stat-sub">Setelah {formatRupiah(totalExpenses)} pengeluaran</div>
+          <div className="stat-sub">
+            {totalOpex > 0 ? `Setelah Rp${totalOpex.toLocaleString("id-ID")} opex` : "Belum ada biaya operasional"}
+          </div>
         </div>
       </div>
+
+      {/* Stock purchase info */}
+      {totalStockPurchase > 0 && (
+        <div className="card" style={{ marginBottom: "20px" }}>
+          <div className="card-body" style={{ padding: "16px 20px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: "16px" }}>
+              <div>
+                <div style={{ fontSize: "12px", color: "var(--text2)", marginBottom: "4px" }}>📦 Modal Pembelian Stok</div>
+                <div style={{ fontWeight: 700, fontSize: "18px", color: "var(--danger)", fontFamily: "'JetBrains Mono', monospace" }}>
+                  {formatRupiah(totalStockPurchase)}
+                </div>
+                <div style={{ fontSize: "12px", color: "var(--text3)", marginTop: "2px" }}>Dicatat sebagai aset, bukan pengurang profit</div>
+              </div>
+              <div>
+                <div style={{ fontSize: "12px", color: "var(--text2)", marginBottom: "4px" }}>💰 Profit setelah Modal Stok</div>
+                <div style={{ fontWeight: 700, fontSize: "18px", fontFamily: "'JetBrains Mono', monospace",
+                  color: netProfitAfterStock >= 0 ? "var(--success)" : "var(--danger)" }}>
+                  {formatRupiah(netProfitAfterStock)}
+                </div>
+                <div style={{ fontSize: "12px", color: "var(--text3)", marginTop: "2px" }}>Jika modal stok dianggap pengeluaran</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Payment breakdown */}
       {transactions.length > 0 && (

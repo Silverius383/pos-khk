@@ -126,11 +126,14 @@ function TxDetailModal({ tx, onClose }: { tx: Transaction; onClose: () => void }
 interface DashboardClientProps {
   stats: {
     today_sales: number;
-    today_profit: number;
+    today_profit: number;       // gross profit - biaya operasional (exclude pembelian stok)
     today_tx_count: number;
     month_sales: number;
-    month_profit: number;
+    month_profit: number;       // gross profit - biaya operasional (exclude pembelian stok)
+    month_profit_after_stock: number; // gross profit - semua pengeluaran termasuk stok
     month_tx_count: number;
+    month_opex: number;         // biaya operasional saja
+    month_stock_purchase: number; // pembelian stok
   };
   lowStockProducts: Product[];
   recentTransactions: Transaction[];
@@ -195,11 +198,30 @@ export default function DashboardClient({ stats, lowStockProducts, recentTransac
           <div className="stat-sub">{stats.month_tx_count} transaksi</div>
         </div>
         <div className="stat-card purple">
-          <div className="stat-label">Profit Bulan Ini</div>
+          <div className="stat-label">Profit Operasional</div>
           <div className="stat-value">{formatRupiah(stats.month_profit)}</div>
-          <div className="stat-sub">Setelah biaya operasional</div>
+          <div className="stat-sub">Belum termasuk pembelian stok</div>
         </div>
       </div>
+
+      {/* Info pembelian stok bulan ini */}
+      {stats.month_stock_purchase > 0 && (
+        <div style={{
+          background: "var(--surface2)", border: "1px solid var(--border)",
+          borderRadius: "var(--radius-sm)", padding: "10px 16px",
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+          marginBottom: "20px", fontSize: "13px",
+        }}>
+          <span style={{ color: "var(--text2)" }}>
+            📦 Modal Pembelian Stok bulan ini: <strong style={{ color: "var(--text)" }}>{formatRupiah(stats.month_stock_purchase)}</strong>
+          </span>
+          <span style={{ color: "var(--text2)" }}>
+            Profit setelah modal stok: <strong style={{ color: stats.month_profit_after_stock >= 0 ? "var(--success)" : "var(--danger)" }}>
+              {formatRupiah(stats.month_profit_after_stock)}
+            </strong>
+          </span>
+        </div>
+      )}
 
       <div className="grid-2">
         {/* Low Stock */}
