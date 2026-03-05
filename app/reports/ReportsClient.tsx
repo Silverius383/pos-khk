@@ -71,6 +71,7 @@ export default function ReportsClient({
   const totalExpenses      = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
   const netProfit          = grossProfit - totalOpex;           // profit operasional
   const netProfitAfterStock = grossProfit - totalExpenses;      // profit setelah modal stok
+  const avgMargin          = totalSales > 0 ? Math.round((grossProfit / totalSales) * 100) : 0;
 
   // Payment method breakdown
   const paymentBreakdown = useMemo(() => {
@@ -119,12 +120,12 @@ export default function ReportsClient({
           <div className="stat-value">{formatRupiah(totalDiscount)}</div>
           <div className="stat-sub">Dari {transactions.filter(t => t.total_discount > 0).length} transaksi</div>
         </div>
-        <div className="stat-card green">
-          <div className="stat-label">Gross Profit</div>
-          <div className="stat-value">{formatRupiah(grossProfit)}</div>
-          <div className="stat-sub">Sebelum biaya operasional</div>
+        <div className="stat-card orange">
+          <div className="stat-label">Margin Rata-rata</div>
+          <div className="stat-value">{avgMargin}%</div>
+          <div className="stat-sub">Dari {transactions.length} transaksi</div>
         </div>
-        <div className="stat-card green">
+        <div className="stat-card purple">
           <div className="stat-label">Profit Operasional</div>
           <div className="stat-value" style={{ color: netProfit >= 0 ? undefined : "var(--danger)" }}>
             {formatRupiah(netProfit)}
@@ -193,7 +194,7 @@ export default function ReportsClient({
         <div className="card-header">
           <div className="card-title">📋 Riwayat Transaksi ({transactions.length})</div>
         </div>
-        <div className="table-wrap">
+        <div className="table-wrap report-table-wrap">
           <table>
             <thead>
               <tr>
@@ -240,7 +241,7 @@ export default function ReportsClient({
       {expenses.length > 0 && (
         <div className="card">
           <div className="card-header"><div className="card-title">💸 Pengeluaran ({expenses.length})</div></div>
-          <div className="table-wrap">
+          <div className="table-wrap report-table-wrap">
             <table>
               <thead>
                 <tr><th>Tanggal</th><th>Keterangan</th><th>Kategori</th><th>Jumlah</th></tr>

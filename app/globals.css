@@ -410,6 +410,20 @@ tbody tr:hover { background: var(--bg); }
   overflow-x: auto;
   border-radius: 0 0 var(--radius) var(--radius);
 }
+.report-table-wrap {
+  max-height: 480px;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+.report-table-wrap thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  z-index: 1;
+  box-shadow: 0 1px 0 var(--border);
+}
+
 .products-table-wrap thead th {
   position: sticky;
   top: 0;
