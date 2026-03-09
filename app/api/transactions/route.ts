@@ -11,15 +11,19 @@ export async function GET(request: NextRequest) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const dateFrom = searchParams.get("from");
-    const dateTo   = searchParams.get("to");
-    const limit    = parseInt(searchParams.get("limit") || "50");
+    const dateFrom       = searchParams.get("from");
+    const dateTo         = searchParams.get("to");
+    const limit          = parseInt(searchParams.get("limit") || "50");
+    const paymentStatus  = searchParams.get("payment_status"); // filter "pending" | "paid"
 
     const where: Record<string, unknown> = {};
     if (dateFrom || dateTo) {
       where.created_at = {};
       if (dateFrom) (where.created_at as Record<string, Date>).gte = new Date(dateFrom + "T00:00:00.000Z");
       if (dateTo)   (where.created_at as Record<string, Date>).lte = new Date(dateTo   + "T23:59:59.999Z");
+    }
+    if (paymentStatus) {
+      where.payment_status = paymentStatus;
     }
 
     const transactions = await prisma.transaction.findMany({
@@ -43,14 +47,30 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { items, payment_method, cash_received } = body;
+    const {
+      items,
+      payment_method,
+      cash_received,
+      payment_status = "paid",    // "paid" | "pending"
+      buyer_type     = "walk_in", // "walk_in" | "cafe" | "individual"
+      buyer_name,
+    } = body;
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ success: false, error: "Keranjang belanja kosong" }, { status: 400 });
     }
 
-    const validMethods = ["tunai", "transfer", "qris"];
-    const method = validMethods.includes(payment_method) ? payment_method : "tunai";
+    const validMethods     = ["tunai", "transfer", "qris"];
+    const validBuyerTypes  = ["walk_in", "cafe", "individual"];
+    const validStatuses    = ["paid", "pending"];
+
+    const method     = validMethods.includes(payment_method) ? payment_method : "tunai";
+    const buyerType  = validBuyerTypes.includes(buyer_type) ? buyer_type : "walk_in";
+    const payStatus  = validStatuses.includes(payment_status) ? payment_status : "paid";
+
+    // buyer_name hanya boleh diisi jika bukan walk_in
+    const resolvedBuyerName =
+      buyerType !== "walk_in" && buyer_name ? buyer_name.trim() || null : null;
 
     const transaction = await prisma.$transaction(async (tx) => {
       const productIds = items.map((i: { product_id: string }) => i.product_id);
@@ -98,16 +118,21 @@ export async function POST(request: NextRequest) {
 
       const newTransaction = await tx.transaction.create({
         data: {
-          total_amount:   totalAmount,
-          total_discount: totalDiscount,
-          total_profit:   totalProfit,
-          payment_method: method,
-          cash_received:  method === "tunai" && cash_received > 0 ? cash_received : null,
+          total_amount:    totalAmount,
+          total_discount:  totalDiscount,
+          total_profit:    totalProfit,
+          payment_method:  method,
+          cash_received:   method === "tunai" && cash_received > 0 ? cash_received : null,
+          payment_status:  payStatus,
+          paid_at:         payStatus === "paid" ? new Date() : null,
+          buyer_type:      buyerType,
+          buyer_name:      resolvedBuyerName,
           items: { create: itemsData },
         },
         include: { items: true },
       });
 
+      // Stok SELALU dikurangi, baik bayar sekarang maupun nanti
       await Promise.all(
         items.map((item: { product_id: string; quantity: number }) =>
           tx.product.update({

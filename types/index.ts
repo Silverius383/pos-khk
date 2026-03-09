@@ -32,6 +32,10 @@ export interface DiscountInfo {
 
 export type PaymentMethod = "tunai" | "transfer" | "qris";
 
+// ── Tipe baru ─────────────────────────────────────────────────────────────────
+export type PaymentStatus = "paid" | "pending";
+export type BuyerType     = "walk_in" | "cafe" | "individual";
+
 export interface TransactionItem {
   id: string;
   transaction_id: string;
@@ -55,6 +59,12 @@ export interface Transaction {
   total_profit: number;
   payment_method: PaymentMethod;
   cash_received: number | null;
+  // ── Field baru ──────────────────────────────────────────────────────────────
+  payment_status: PaymentStatus;
+  paid_at: string | null;
+  buyer_type: BuyerType;
+  buyer_name: string | null;
+  // ────────────────────────────────────────────────────────────────────────────
   created_at: string;
   items: TransactionItem[];
 }

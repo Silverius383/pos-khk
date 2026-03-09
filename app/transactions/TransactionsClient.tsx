@@ -3,7 +3,10 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Product, CartItem, Transaction, DiscountType, PaymentMethod } from "@/types";
+import {
+  Product, CartItem, Transaction, DiscountType,
+  PaymentMethod, BuyerType, PaymentStatus,
+} from "@/types";
 import { formatRupiah, calculateDiscountAmount, calculateFinalPrice } from "@/utils/currency";
 import { formatDateTime, isExpired } from "@/utils/date";
 import Modal from "@/components/ui/Modal";
@@ -19,6 +22,39 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string; icon: string; colo
   { value: "transfer", label: "Transfer", icon: "🏦", color: "#1C64F2" },
   { value: "qris",     label: "QRIS",     icon: "📱", color: "#7C3AED" },
 ];
+
+const BUYER_TYPES: { value: BuyerType; label: string; icon: string; desc: string }[] = [
+  { value: "walk_in",    label: "Beli di Toko",   icon: "🏪", desc: "Pembeli datang langsung" },
+  { value: "cafe",       label: "Cafe / Reseller", icon: "☕", desc: "Pemesanan dari cafe" },
+  { value: "individual", label: "Perorangan",      icon: "👤", desc: "Order personal" },
+];
+
+// ── Helper Badges ──────────────────────────────────────────────────────────────
+function PaymentStatusBadge({ status }: { status: "paid" | "pending" }) {
+  return status === "paid" ? (
+    <span className="badge badge-success">✅ Lunas</span>
+  ) : (
+    <span className="badge badge-warning">🕐 Belum Lunas</span>
+  );
+}
+
+function BuyerTypeBadge({ type }: { type: BuyerType }) {
+  const map: Record<BuyerType, { label: string; icon: string; bg: string; color: string }> = {
+    walk_in:    { label: "Toko",       icon: "🏪", bg: "var(--surface2)", color: "var(--text2)" },
+    cafe:       { label: "Cafe",       icon: "☕", bg: "#EBF0FF",         color: "var(--primary)" },
+    individual: { label: "Perorangan", icon: "👤", bg: "#F3E8FF",         color: "#7C3AED" },
+  };
+  const b = map[type] ?? map.walk_in;
+  return (
+    <span style={{
+      display: "inline-flex", alignItems: "center", gap: "4px",
+      padding: "2px 8px", borderRadius: "99px", fontSize: "11px", fontWeight: 600,
+      background: b.bg, color: b.color,
+    }}>
+      {b.icon} {b.label}
+    </span>
+  );
+}
 
 // ── Discount Modal ─────────────────────────────────────────────────────────────
 function DiscountModal({
@@ -104,40 +140,64 @@ function DiscountModal({
   );
 }
 
-// ── Payment Method Modal ───────────────────────────────────────────────────────
+// ── Payment Modal (3-step: tipe pembeli → status bayar → metode) ───────────────
 function PaymentModal({
   totalFinal, onConfirm, onClose, processing,
 }: {
   totalFinal: number;
-  onConfirm: (method: PaymentMethod, cashReceived?: number) => void;
+  onConfirm: (opts: {
+    method: PaymentMethod;
+    cashReceived?: number;
+    paymentStatus: PaymentStatus;
+    buyerType: BuyerType;
+    buyerName?: string;
+  }) => void;
   onClose: () => void;
   processing: boolean;
 }) {
-  const [selected, setSelected] = useState<PaymentMethod>("tunai");
+  const [payStatus, setPayStatus] = useState<PaymentStatus>("paid");
+  const [selected, setSelected]   = useState<PaymentMethod>("tunai");
   const [cashInput, setCashInput] = useState("");
+  const [buyerType, setBuyerType] = useState<BuyerType>("walk_in");
+  const [buyerName, setBuyerName] = useState("");
 
-  const cashAmount  = parseInt(cashInput.replace(/\D/g, "")) || 0;
-  const cashChange  = cashAmount - totalFinal;
-  const isValidCash = selected !== "tunai" || cashAmount >= totalFinal;
+  const cashAmount     = parseInt(cashInput.replace(/\D/g, "")) || 0;
+  const cashChange     = cashAmount - totalFinal;
+  const isValidCash    = payStatus === "pending" || selected !== "tunai" || cashAmount >= totalFinal;
+  const needsBuyerName = buyerType !== "walk_in";
 
   const formatCashInput = (val: string) => {
     const num = val.replace(/\D/g, "");
     return num ? parseInt(num).toLocaleString("id-ID") : "";
   };
 
+  const handleConfirm = () => {
+    onConfirm({
+      method:        selected,
+      cashReceived:  selected === "tunai" && cashAmount > 0 ? cashAmount : undefined,
+      paymentStatus: payStatus,
+      buyerType,
+      buyerName:     needsBuyerName && buyerName.trim() ? buyerName.trim() : undefined,
+    });
+  };
+
   return (
     <Modal
-      title="💳 Pilih Metode Pembayaran"
+      title="🧾 Konfirmasi Transaksi"
       onClose={onClose}
       footer={
         <>
           <button className="btn btn-ghost" onClick={onClose} disabled={processing}>Batal</button>
           <button
-            className="btn btn-success"
-            onClick={() => onConfirm(selected, selected === "tunai" && cashAmount > 0 ? cashAmount : undefined)}
+            className={`btn ${payStatus === "paid" ? "btn-success" : "btn-primary"}`}
+            onClick={handleConfirm}
             disabled={processing || !isValidCash}
           >
-            {processing ? "⏳ Memproses..." : "✅ Konfirmasi"}
+            {processing
+              ? "⏳ Memproses..."
+              : payStatus === "paid"
+              ? "✅ Konfirmasi & Lunas"
+              : "📋 Simpan Hutang"}
           </button>
         </>
       }
@@ -153,14 +213,241 @@ function PaymentModal({
         </div>
       </div>
 
-      {/* Method picker */}
+      {/* STEP 1: Tipe Pembeli */}
+      <div className="form-group">
+        <label className="form-label">👥 Tipe Pembeli</label>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
+          {BUYER_TYPES.map((bt) => (
+            <button
+              key={bt.value}
+              onClick={() => { setBuyerType(bt.value); if (bt.value === "walk_in") setBuyerName(""); }}
+              style={{
+                padding: "12px 8px", borderRadius: "10px", fontFamily: "inherit",
+                cursor: "pointer", textAlign: "center", transition: "all 0.15s",
+                border: `2px solid ${buyerType === bt.value ? "var(--primary)" : "var(--border)"}`,
+                background: buyerType === bt.value ? "var(--primary-light)" : "var(--surface)",
+              }}
+            >
+              <div style={{ fontSize: "20px", marginBottom: "4px" }}>{bt.icon}</div>
+              <div style={{ fontSize: "12px", fontWeight: 700, color: buyerType === bt.value ? "var(--primary)" : "var(--text)" }}>
+                {bt.label}
+              </div>
+              <div style={{ fontSize: "10px", color: "var(--text3)", marginTop: "2px" }}>{bt.desc}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Nama pemesan — hanya muncul jika cafe/individual */}
+      {needsBuyerName && (
+        <div className="form-group">
+          <label className="form-label">
+            {buyerType === "cafe" ? "☕ Nama Cafe / Toko" : "👤 Nama Pemesan"}
+            <span style={{ color: "var(--text3)", fontWeight: 400, marginLeft: "6px" }}>(opsional)</span>
+          </label>
+          <input
+            className="form-input"
+            value={buyerName}
+            onChange={(e) => setBuyerName(e.target.value)}
+            placeholder={buyerType === "cafe" ? "Contoh: Cafe Melati" : "Contoh: Budi Santoso"}
+            autoFocus
+          />
+        </div>
+      )}
+
+      <div className="divider" />
+
+      {/* STEP 2: Status Pembayaran */}
+      <div className="form-group">
+        <label className="form-label">💳 Status Pembayaran</label>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+          <button
+            onClick={() => setPayStatus("paid")}
+            style={{
+              padding: "14px 12px", borderRadius: "10px", fontFamily: "inherit",
+              cursor: "pointer", textAlign: "center", transition: "all 0.15s",
+              border: `2px solid ${payStatus === "paid" ? "#057A55" : "var(--border)"}`,
+              background: payStatus === "paid" ? "#DEF7EC" : "var(--surface)",
+            }}
+          >
+            <div style={{ fontSize: "22px", marginBottom: "4px" }}>✅</div>
+            <div style={{ fontSize: "13px", fontWeight: 700, color: payStatus === "paid" ? "#057A55" : "var(--text)" }}>
+              Bayar Sekarang
+            </div>
+            <div style={{ fontSize: "11px", color: "var(--text3)", marginTop: "2px" }}>Langsung lunas</div>
+          </button>
+          <button
+            onClick={() => { setPayStatus("pending"); setCashInput(""); }}
+            style={{
+              padding: "14px 12px", borderRadius: "10px", fontFamily: "inherit",
+              cursor: "pointer", textAlign: "center", transition: "all 0.15s",
+              border: `2px solid ${payStatus === "pending" ? "#D97706" : "var(--border)"}`,
+              background: payStatus === "pending" ? "#FEF3C7" : "var(--surface)",
+            }}
+          >
+            <div style={{ fontSize: "22px", marginBottom: "4px" }}>🕐</div>
+            <div style={{ fontSize: "13px", fontWeight: 700, color: payStatus === "pending" ? "#D97706" : "var(--text)" }}>
+              Bayar Nanti
+            </div>
+            <div style={{ fontSize: "11px", color: "var(--text3)", marginTop: "2px" }}>Stok tetap dikurangi</div>
+          </button>
+        </div>
+
+        {payStatus === "pending" && (
+          <div style={{
+            marginTop: "10px", padding: "10px 14px",
+            background: "#FEF3C7", border: "1px solid #FCD34D",
+            borderRadius: "var(--radius-sm)", fontSize: "12px", color: "#92400E",
+          }}>
+            ⚠️ Stok akan langsung dikurangi. Tandai <strong>Lunas</strong> nanti dari struk atau halaman laporan.
+          </div>
+        )}
+      </div>
+
+      {/* STEP 3: Metode Bayar — hanya tampil jika bayar sekarang */}
+      {payStatus === "paid" && (
+        <div className="form-group">
+          <label className="form-label">💵 Metode Pembayaran</label>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
+            {PAYMENT_METHODS.map((m) => (
+              <button
+                key={m.value}
+                onClick={() => { setSelected(m.value); setCashInput(""); }}
+                style={{
+                  padding: "14px 8px", borderRadius: "10px", fontFamily: "inherit",
+                  cursor: "pointer", textAlign: "center", transition: "all 0.15s",
+                  border: `2px solid ${selected === m.value ? m.color : "var(--border)"}`,
+                  background: selected === m.value ? `${m.color}18` : "var(--surface)",
+                }}
+              >
+                <div style={{ fontSize: "22px", marginBottom: "4px" }}>{m.icon}</div>
+                <div style={{ fontSize: "13px", fontWeight: 700, color: selected === m.value ? m.color : "var(--text2)" }}>
+                  {m.label}
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Kalkulator kembalian */}
+          {selected === "tunai" && (
+            <div className="form-group" style={{ marginTop: "12px", marginBottom: 0 }}>
+              <label className="form-label">Uang Diterima (opsional)</label>
+              <input
+                className="form-input"
+                inputMode="numeric"
+                placeholder="Masukkan jumlah uang..."
+                value={cashInput}
+                onChange={(e) => setCashInput(formatCashInput(e.target.value))}
+                style={{ fontSize: "16px", fontWeight: 700 }}
+              />
+              {cashAmount > 0 && (
+                <div style={{
+                  marginTop: "10px", padding: "12px 16px", borderRadius: "var(--radius-sm)",
+                  background: cashChange >= 0 ? "var(--success-light)" : "var(--danger-light)",
+                  border: `1px solid ${cashChange >= 0 ? "#6EE7B7" : "#FCA5A5"}`,
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px", marginBottom: "4px" }}>
+                    <span style={{ color: "var(--text2)" }}>Uang diterima</span>
+                    <span className="td-mono">{formatRupiah(cashAmount)}</span>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px", marginBottom: "4px" }}>
+                    <span style={{ color: "var(--text2)" }}>Total belanja</span>
+                    <span className="td-mono">− {formatRupiah(totalFinal)}</span>
+                  </div>
+                  <div style={{
+                    display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: "16px",
+                    paddingTop: "8px", borderTop: "1px solid var(--border)",
+                  }}>
+                    <span style={{ color: cashChange >= 0 ? "var(--success)" : "var(--danger)" }}>
+                      {cashChange >= 0 ? "Kembalian" : "Kurang"}
+                    </span>
+                    <span className="td-mono" style={{ color: cashChange >= 0 ? "var(--success)" : "var(--danger)" }}>
+                      {formatRupiah(Math.abs(cashChange))}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {selected === "transfer" && (
+            <div style={{ marginTop: "10px", padding: "12px 16px", borderRadius: "var(--radius-sm)", background: "#EBF0FF", border: "1px solid #93C5FD", fontSize: "13px", color: "var(--primary)" }}>
+              🏦 Pastikan transfer sudah diterima sebelum konfirmasi.
+            </div>
+          )}
+          {selected === "qris" && (
+            <div style={{ marginTop: "10px", padding: "12px 16px", borderRadius: "var(--radius-sm)", background: "#F3E8FF", border: "1px solid #C4B5FD", fontSize: "13px", color: "#7C3AED" }}>
+              📱 Pastikan notifikasi QRIS sudah masuk sebelum konfirmasi.
+            </div>
+          )}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+// ── Modal Tandai Lunas ─────────────────────────────────────────────────────────
+function LunasModal({
+  tx, onConfirm, onClose, processing,
+}: {
+  tx: Transaction;
+  onConfirm: (method: PaymentMethod, cashReceived?: number) => void;
+  onClose: () => void;
+  processing: boolean;
+}) {
+  const [selected, setSelected] = useState<PaymentMethod>("tunai");
+  const [cashInput, setCashInput] = useState("");
+  const cashAmount = parseInt(cashInput.replace(/\D/g, "")) || 0;
+  const cashChange = cashAmount - tx.total_amount;
+  const isValid    = selected !== "tunai" || cashAmount >= tx.total_amount;
+
+  const formatCashInput = (val: string) => {
+    const num = val.replace(/\D/g, "");
+    return num ? parseInt(num).toLocaleString("id-ID") : "";
+  };
+
+  return (
+    <Modal
+      title="✅ Tandai Lunas"
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn btn-ghost" onClick={onClose} disabled={processing}>Batal</button>
+          <button
+            className="btn btn-success"
+            onClick={() => onConfirm(selected, cashAmount > 0 ? cashAmount : undefined)}
+            disabled={processing || !isValid}
+          >
+            {processing ? "⏳ Memproses..." : "✅ Lunas Sekarang"}
+          </button>
+        </>
+      }
+    >
+      {/* Info transaksi */}
+      <div style={{ background: "var(--surface2)", borderRadius: "var(--radius-sm)", padding: "14px 16px", marginBottom: "20px" }}>
+        {tx.buyer_name && (
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "8px" }}>
+            <span className="text-muted">{tx.buyer_type === "cafe" ? "Cafe" : "Pemesan"}</span>
+            <span style={{ fontWeight: 700 }}>{tx.buyer_name}</span>
+          </div>
+        )}
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "8px" }}>
+          <span className="text-muted">Tanggal Order</span>
+          <span style={{ fontWeight: 600 }}>{formatDateTime(tx.created_at)}</span>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "16px", fontWeight: 800 }}>
+          <span>Total Tagihan</span>
+          <span style={{ color: "var(--primary)", fontFamily: "'JetBrains Mono', monospace" }}>
+            {formatRupiah(tx.total_amount)}
+          </span>
+        </div>
+      </div>
+
       <div className="form-group">
         <label className="form-label">Metode Pembayaran</label>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
           {PAYMENT_METHODS.map((m) => (
-            <button
-              key={m.value}
-              onClick={() => { setSelected(m.value); setCashInput(""); }}
+            <button key={m.value} onClick={() => { setSelected(m.value); setCashInput(""); }}
               style={{
                 padding: "14px 8px", borderRadius: "10px", fontFamily: "inherit",
                 cursor: "pointer", textAlign: "center", transition: "all 0.15s",
@@ -168,48 +455,26 @@ function PaymentModal({
                 background: selected === m.value ? `${m.color}18` : "var(--surface)",
               }}
             >
-              <div style={{ fontSize: "22px", marginBottom: "4px" }}>{m.icon}</div>
-              <div style={{ fontSize: "13px", fontWeight: 700, color: selected === m.value ? m.color : "var(--text2)" }}>
-                {m.label}
-              </div>
+              <div style={{ fontSize: "20px", marginBottom: "4px" }}>{m.icon}</div>
+              <div style={{ fontSize: "13px", fontWeight: 700, color: selected === m.value ? m.color : "var(--text2)" }}>{m.label}</div>
             </button>
           ))}
         </div>
       </div>
 
-      {/* Cash input + change calculator */}
       {selected === "tunai" && (
-        <div className="form-group" style={{ marginTop: "4px" }}>
-          <label className="form-label">Uang Diterima (opsional)</label>
-          <input
-            className="form-input"
-            inputMode="numeric"
-            placeholder="Masukkan jumlah uang..."
-            value={cashInput}
-            onChange={(e) => setCashInput(formatCashInput(e.target.value))}
-            style={{ fontSize: "16px", fontWeight: 700 }}
-          />
-
+        <div className="form-group">
+          <label className="form-label">Uang Diterima</label>
+          <input className="form-input" inputMode="numeric" placeholder="Masukkan jumlah uang..."
+            value={cashInput} onChange={(e) => setCashInput(formatCashInput(e.target.value))}
+            style={{ fontSize: "16px", fontWeight: 700 }} />
           {cashAmount > 0 && (
             <div style={{
-              marginTop: "10px", padding: "12px 16px",
-              borderRadius: "var(--radius-sm)",
+              marginTop: "10px", padding: "12px 16px", borderRadius: "var(--radius-sm)",
               background: cashChange >= 0 ? "var(--success-light)" : "var(--danger-light)",
               border: `1px solid ${cashChange >= 0 ? "#6EE7B7" : "#FCA5A5"}`,
             }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px", marginBottom: "4px" }}>
-                <span style={{ color: "var(--text2)" }}>Uang diterima</span>
-                <span className="td-mono">{formatRupiah(cashAmount)}</span>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px", marginBottom: "4px" }}>
-                <span style={{ color: "var(--text2)" }}>Total belanja</span>
-                <span className="td-mono">− {formatRupiah(totalFinal)}</span>
-              </div>
-              <div style={{
-                display: "flex", justifyContent: "space-between",
-                fontWeight: 800, fontSize: "16px",
-                paddingTop: "8px", borderTop: "1px solid var(--border)",
-              }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "14px", fontWeight: 800, paddingTop: "4px" }}>
                 <span style={{ color: cashChange >= 0 ? "var(--success)" : "var(--danger)" }}>
                   {cashChange >= 0 ? "Kembalian" : "Kurang"}
                 </span>
@@ -221,24 +486,6 @@ function PaymentModal({
           )}
         </div>
       )}
-
-      {selected === "transfer" && (
-        <div style={{
-          padding: "12px 16px", borderRadius: "var(--radius-sm)",
-          background: "#EBF0FF", border: "1px solid #93C5FD", fontSize: "13px", color: "var(--primary)"
-        }}>
-          🏦 Pastikan transfer sudah diterima sebelum konfirmasi.
-        </div>
-      )}
-
-      {selected === "qris" && (
-        <div style={{
-          padding: "12px 16px", borderRadius: "var(--radius-sm)",
-          background: "#F3E8FF", border: "1px solid #C4B5FD", fontSize: "13px", color: "#7C3AED"
-        }}>
-          📱 Pastikan notifikasi QRIS sudah masuk sebelum konfirmasi.
-        </div>
-      )}
     </Modal>
   );
 }
@@ -246,16 +493,18 @@ function PaymentModal({
 // ── Main Component ─────────────────────────────────────────────────────────────
 export default function TransactionsClient({ initialProducts }: TransactionsClientProps) {
   const router = useRouter();
-  const [products, setProducts]     = useState<Product[]>(initialProducts);
-  const [cart, setCart]             = useState<CartItem[]>([]);
-  const [search, setSearch]         = useState("");
-  const [catFilter, setCatFilter]   = useState("Semua");
-  const [processing, setProcessing] = useState(false);
-  const [receipt, setReceipt]       = useState<Transaction | null>(null);
-  const [error, setError]           = useState("");
+  const [products, setProducts]           = useState<Product[]>(initialProducts);
+  const [cart, setCart]                   = useState<CartItem[]>([]);
+  const [search, setSearch]               = useState("");
+  const [catFilter, setCatFilter]         = useState("Semua");
+  const [processing, setProcessing]       = useState(false);
+  const [receipt, setReceipt]             = useState<Transaction | null>(null);
+  const [error, setError]                 = useState("");
   const [discountModal, setDiscountModal] = useState<CartItem | null>(null);
   const [paymentModal, setPaymentModal]   = useState(false);
   const [sheetOpen, setSheetOpen]         = useState(false);
+  const [lunasModal, setLunasModal]       = useState<Transaction | null>(null);
+  const [lunasProcessing, setLunasProcessing] = useState(false);
 
   const categories = useMemo(
     () => ["Semua", ...Array.from(new Set(products.map((p) => p.category).filter(Boolean)))],
@@ -319,7 +568,13 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
   const cartCount      = cart.reduce((s, i) => s + i.quantity, 0);
   const hasDiscount    = cart.some((i) => i.discount_type !== "none" && i.discount_amount > 0);
 
-  const checkout = async (method: PaymentMethod, cashReceived?: number) => {
+  const checkout = async (opts: {
+    method: PaymentMethod;
+    cashReceived?: number;
+    paymentStatus: PaymentStatus;
+    buyerType: BuyerType;
+    buyerName?: string;
+  }) => {
     if (cart.length === 0) return;
     setProcessing(true);
     setError("");
@@ -330,8 +585,11 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
         headers: { "Content-Type": "application/json" },
         credentials: "include",
         body: JSON.stringify({
-          payment_method: method,
-          cash_received: method === "tunai" && cashReceived ? cashReceived : null,
+          payment_method: opts.method,
+          cash_received:  opts.method === "tunai" && opts.cashReceived ? opts.cashReceived : null,
+          payment_status: opts.paymentStatus,
+          buyer_type:     opts.buyerType,
+          buyer_name:     opts.buyerName || null,
           items: cart.map((i) => ({
             product_id:     i.product_id,
             quantity:       i.quantity,
@@ -361,7 +619,31 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
     }
   };
 
-  // ── Cart Items (shared) ────────────────────────────────────────────────────
+  const handleLunas = async (method: PaymentMethod, cashReceived?: number) => {
+    if (!lunasModal) return;
+    setLunasProcessing(true);
+    try {
+      const res = await fetch(`/api/transactions/${lunasModal.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ payment_method: method, cash_received: cashReceived }),
+      });
+      const data = await res.json();
+      if (!data.success) { alert(data.error || "Gagal update"); return; }
+
+      // Update receipt kalau sedang dibuka
+      if (receipt && receipt.id === lunasModal.id) setReceipt(data.data);
+      setLunasModal(null);
+      router.refresh();
+    } catch {
+      alert("Gagal menghubungi server");
+    } finally {
+      setLunasProcessing(false);
+    }
+  };
+
+  // ── Cart Items (shared desktop & mobile) ──────────────────────────────────
   const CartItemsList = () => (
     <>
       {cart.length === 0 ? (
@@ -439,7 +721,6 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
         <span className="cart-total-val">{formatRupiah(totalFinal)}</span>
       </div>
 
-      {/* Tombol Proses → buka PaymentModal */}
       <button
         className="btn btn-success btn-lg"
         style={{ width: "100%", marginTop: "12px" }}
@@ -475,40 +756,42 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
                 onClick={() => setCatFilter(c)}>{c}</button>
             ))}
           </div>
-          <div className="product-grid">
-            {filtered.map((p) => {
-              const inCart = cart.find((i) => i.product_id === p.id);
-              const isOut  = p.stock <= 0;
-              return (
-                <div key={p.id} className={`product-tile ${isOut ? "out" : ""}`}
-                  onClick={() => !isOut && addToCart(p)}>
-                  {isExpired(p.expired_date) && (
-                    <div style={{ position: "absolute", top: 6, right: 6 }}>
-                      <span className="badge badge-danger" style={{ fontSize: "9px", padding: "2px 6px" }}>Expired</span>
-                    </div>
-                  )}
-                  {inCart && (
-                    <div style={{ position: "absolute", top: 6, left: 6 }}>
-                      <span className="badge badge-blue" style={{ fontSize: "9px", padding: "2px 6px" }}>{inCart.quantity}×</span>
-                    </div>
-                  )}
-                  {inCart && inCart.discount_type !== "none" && (
-                    <div style={{ position: "absolute", bottom: 6, right: 6 }}>
-                      <span className="badge badge-warning" style={{ fontSize: "9px", padding: "2px 6px" }}>🏷️ Diskon</span>
-                    </div>
-                  )}
-                  <div className="product-tile-cat">{p.category || "Umum"}</div>
-                  <div className="product-tile-name">{p.name}</div>
-                  <div className="product-tile-price">{formatRupiah(p.sell_price)}</div>
-                  <div className="product-tile-stock">{isOut ? "Habis" : `Stok: ${p.stock}`}</div>
+          <div className="product-grid-wrap">
+            <div className="product-grid">
+              {filtered.map((p) => {
+                const inCart = cart.find((i) => i.product_id === p.id);
+                const isOut  = p.stock <= 0;
+                return (
+                  <div key={p.id} className={`product-tile ${isOut ? "out" : ""}`}
+                    onClick={() => !isOut && addToCart(p)}>
+                    {isExpired(p.expired_date) && (
+                      <div style={{ position: "absolute", top: 6, right: 6 }}>
+                        <span className="badge badge-danger" style={{ fontSize: "9px", padding: "2px 6px" }}>Expired</span>
+                      </div>
+                    )}
+                    {inCart && (
+                      <div style={{ position: "absolute", top: 6, left: 6 }}>
+                        <span className="badge badge-blue" style={{ fontSize: "9px", padding: "2px 6px" }}>{inCart.quantity}×</span>
+                      </div>
+                    )}
+                    {inCart && inCart.discount_type !== "none" && (
+                      <div style={{ position: "absolute", bottom: 6, right: 6 }}>
+                        <span className="badge badge-warning" style={{ fontSize: "9px", padding: "2px 6px" }}>🏷️ Diskon</span>
+                      </div>
+                    )}
+                    <div className="product-tile-cat">{p.category || "Umum"}</div>
+                    <div className="product-tile-name">{p.name}</div>
+                    <div className="product-tile-price">{formatRupiah(p.sell_price)}</div>
+                    <div className="product-tile-stock">{isOut ? "Habis" : `Stok: ${p.stock}`}</div>
+                  </div>
+                );
+              })}
+              {filtered.length === 0 && (
+                <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "40px", color: "var(--text3)" }}>
+                  Produk tidak ditemukan
                 </div>
-              );
-            })}
-            {filtered.length === 0 && (
-              <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "40px", color: "var(--text3)" }}>
-                Produk tidak ditemukan
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
 
@@ -555,7 +838,7 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
         <div className="sheet-footer"><CartFooter /></div>
       </div>
 
-      {/* ── Modal Pilih Metode Bayar ── */}
+      {/* ── Modal Checkout ── */}
       {paymentModal && (
         <PaymentModal
           totalFinal={totalFinal}
@@ -572,38 +855,40 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
 
       {/* ── Modal Struk ── */}
       {receipt && (
-        <Modal title="✅ Transaksi Berhasil!" onClose={() => setReceipt(null)}
+        <Modal
+          title={receipt.payment_status === "pending" ? "📋 Transaksi Disimpan (Hutang)" : "✅ Transaksi Berhasil!"}
+          onClose={() => setReceipt(null)}
           footer={
             <div style={{ display: "flex", gap: "8px", width: "100%", justifyContent: "flex-end" }}>
-              <button className="btn btn-ghost" onClick={() => printViaRawBT(receipt)}>
-                🖨️ Cetak Struk
-              </button>
+              {receipt.payment_status === "pending" && (
+                <button className="btn btn-success" onClick={() => setLunasModal(receipt)}>
+                  ✅ Tandai Lunas
+                </button>
+              )}
+              <button className="btn btn-ghost" onClick={() => printViaRawBT(receipt)}>🖨️ Cetak Struk</button>
               <button className="btn btn-primary" onClick={() => setReceipt(null)}>Selesai</button>
             </div>
-          }>
+          }
+        >
           <div className="receipt">
             <div style={{ textAlign: "center", marginBottom: "16px" }}>
-              <div style={{ fontSize: "36px" }}>🧾</div>
+              <div style={{ fontSize: "36px" }}>{receipt.payment_status === "pending" ? "🕐" : "🧾"}</div>
               <div style={{ fontWeight: 700, fontSize: "15px" }}>KHK FROZEN FOOD</div>
               <div style={{ color: "var(--text3)", fontSize: "12px" }}>{formatDateTime(receipt.created_at)}</div>
             </div>
-            <div className="receipt-divider" />
 
-            {/* Badge metode pembayaran */}
-            <div style={{ textAlign: "center", marginBottom: "12px" }}>
-              {(() => {
-                const m = PAYMENT_METHODS.find((p) => p.value === receipt.payment_method);
-                return (
-                  <span style={{
-                    display: "inline-flex", alignItems: "center", gap: "6px",
-                    padding: "4px 14px", borderRadius: "99px", fontSize: "12px", fontWeight: 700,
-                    background: `${m?.color}18`, color: m?.color, border: `1px solid ${m?.color}40`,
-                  }}>
-                    {m?.icon} {m?.label}
-                  </span>
-                );
-              })()}
+            {/* Status & buyer info */}
+            <div style={{ display: "flex", justifyContent: "center", gap: "8px", marginBottom: "12px", flexWrap: "wrap" }}>
+              <PaymentStatusBadge status={receipt.payment_status} />
+              <BuyerTypeBadge type={receipt.buyer_type} />
             </div>
+            {receipt.buyer_name && (
+              <div style={{ textAlign: "center", fontSize: "13px", fontWeight: 600, marginBottom: "12px", color: "var(--primary)" }}>
+                {receipt.buyer_type === "cafe" ? "☕" : "👤"} {receipt.buyer_name}
+              </div>
+            )}
+
+            <div className="receipt-divider" />
 
             {receipt.items.map((item) => (
               <div key={item.id} style={{ marginBottom: "10px" }}>
@@ -634,8 +919,24 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
               <span>TOTAL</span>
               <span className="td-mono">{formatRupiah(receipt.total_amount)}</span>
             </div>
+
+            {receipt.payment_status === "pending" && (
+              <div style={{ marginTop: "12px", padding: "10px 14px", background: "#FEF3C7", border: "1px solid #FCD34D", borderRadius: "var(--radius-sm)", fontSize: "12px", color: "#92400E", textAlign: "center" }}>
+                🕐 Stok sudah dikurangi. Pembayaran belum diterima.
+              </div>
+            )}
           </div>
         </Modal>
+      )}
+
+      {/* ── Modal Tandai Lunas ── */}
+      {lunasModal && (
+        <LunasModal
+          tx={lunasModal}
+          onConfirm={handleLunas}
+          onClose={() => setLunasModal(null)}
+          processing={lunasProcessing}
+        />
       )}
     </div>
   );

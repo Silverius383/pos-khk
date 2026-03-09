@@ -34,7 +34,21 @@ model Transaction {
   total_profit   Int
   payment_method String   @default("tunai")   // "tunai" | "transfer" | "qris"
   cash_received  Int?                          // uang diterima (tunai), null jika transfer/qris
-  created_at     DateTime @default(now())
+
+  // ── Fitur: Status pembayaran ──────────────────────────────────────────────
+  // "paid"    = sudah lunas saat transaksi
+  // "pending" = bayar nanti / hutang
+  payment_status String    @default("paid")
+  paid_at        DateTime?                     // diisi saat tombol Lunas diklik
+
+  // ── Fitur: Tipe pembeli ───────────────────────────────────────────────────
+  // "walk_in"    = beli langsung di toko
+  // "cafe"       = cafe / reseller
+  // "individual" = perorangan / order personal
+  buyer_type String  @default("walk_in")
+  buyer_name String?                           // opsional, hanya untuk cafe / individual
+
+  created_at DateTime @default(now())
 
   items TransactionItem[]
 
