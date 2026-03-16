@@ -21,6 +21,12 @@ const PAYMENT_LABEL: Record<string, string> = {
   qris:     "QRIS",
 };
 
+const BUYER_TYPE_LABEL: Record<string, string> = {
+  walk_in:    "Toko",
+  cafe:       "Cafe",
+  individual: "Perorangan",
+};
+
 // ESC/POS commands as strings
 function esc(...bytes: number[]): string {
   return bytes.map((b) => String.fromCharCode(b)).join("");
@@ -72,6 +78,22 @@ export function buildReceiptString(tx: Transaction): string {
   s += center(formatDate(tx.created_at));
   s += divider();
 
+  // ── Info Pembeli ───────────────────────────────────────────────────────────
+  // Selalu tampilkan tipe pembeli
+  const buyerTypeLabel = BUYER_TYPE_LABEL[tx.buyer_type] ?? "Toko";
+  s += row("Pembeli", buyerTypeLabel);
+
+  // Tampilkan nama jika ada (cafe / perorangan)
+  if (tx.buyer_name && tx.buyer_name.trim()) {
+    s += E.BOLD_ON + row("Nama", tx.buyer_name.trim()) + E.BOLD_OFF;
+  }
+
+  // Status pembayaran
+  const statusLabel = tx.payment_status === "paid" ? "LUNAS" : "BELUM LUNAS (HUTANG)";
+  s += row("Status", statusLabel);
+
+  s += divider();
+
   // Items
   for (const item of tx.items) {
     s += E.BOLD_ON + left(item.product_name) + E.BOLD_OFF;
@@ -94,13 +116,20 @@ export function buildReceiptString(tx: Transaction): string {
   s += E.BOLD_ON + E.DOUBLE_ON + row("TOTAL", formatRp(tx.total_amount)) + E.DOUBLE_OFF + E.BOLD_OFF;
   s += divider();
 
-  const payLabel = PAYMENT_LABEL[tx.payment_method] ?? "Tunai";
-  s += row("Pembayaran", payLabel);
+  // Info pembayaran — hanya tampilkan jika sudah lunas
+  if (tx.payment_status === "paid") {
+    const payLabel = PAYMENT_LABEL[tx.payment_method] ?? "Tunai";
+    s += row("Pembayaran", payLabel);
 
-  if (tx.payment_method === "tunai" && tx.cash_received) {
-    s += row("Uang Diterima", formatRp(tx.cash_received));
-    const change = tx.cash_received - tx.total_amount;
-    s += E.BOLD_ON + row("Kembalian", formatRp(change)) + E.BOLD_OFF;
+    if (tx.payment_method === "tunai" && tx.cash_received) {
+      s += row("Uang Diterima", formatRp(tx.cash_received));
+      const change = tx.cash_received - tx.total_amount;
+      s += E.BOLD_ON + row("Kembalian", formatRp(change)) + E.BOLD_OFF;
+    }
+  } else {
+    // Transaksi hutang — tampilkan pesan
+    s += E.BOLD_ON + center("** BELUM DIBAYAR **") + E.BOLD_OFF;
+    s += E.FONT_SMALL + center("Harap segera dilunasi") + E.FONT_NORMAL;
   }
 
   s += divider();
