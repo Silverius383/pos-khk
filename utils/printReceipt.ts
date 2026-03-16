@@ -128,7 +128,7 @@ export function buildReceiptString(tx: Transaction): string {
     }
   } else {
     // Transaksi hutang — tampilkan pesan
-    s += E.BOLD_ON + center("** BELUM DIBAYAR **") + E.BOLD_OFF;
+    // s += E.BOLD_ON + center("** BELUM DIBAYAR **") + E.BOLD_OFF;
     // s += E.FONT_SMALL + center("Harap segera dilunasi") + E.FONT_NORMAL;
   }
 
