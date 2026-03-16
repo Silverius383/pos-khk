@@ -89,8 +89,8 @@ export function buildReceiptString(tx: Transaction): string {
   }
 
   // Status pembayaran
-  const statusLabel = tx.payment_status === "paid" ? "LUNAS" : "BELUM LUNAS (HUTANG)";
-  s += row("Status", statusLabel);
+  // const statusLabel = tx.payment_status === "paid" ? "LUNAS" : "BELUM LUNAS (HUTANG)";
+  // s += row("Status", statusLabel);
 
   s += divider();
 
@@ -129,7 +129,7 @@ export function buildReceiptString(tx: Transaction): string {
   } else {
     // Transaksi hutang — tampilkan pesan
     s += E.BOLD_ON + center("** BELUM DIBAYAR **") + E.BOLD_OFF;
-    s += E.FONT_SMALL + center("Harap segera dilunasi") + E.FONT_NORMAL;
+    // s += E.FONT_SMALL + center("Harap segera dilunasi") + E.FONT_NORMAL;
   }
 
   s += divider();
