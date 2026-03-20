@@ -2,11 +2,12 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Transaction, Expense, PaymentMethod } from "@/types";
+import { Transaction, Expense, PaymentMethod, BuyerType } from "@/types";
 import { formatRupiah } from "@/utils/currency";
 import { formatDateTime } from "@/utils/date";
 import Modal from "@/components/ui/Modal";
 import { printViaRawBT } from "@/utils/printReceipt";
+import { TrashIcon, EditIcon } from "@/components/ui/Icons";
 
 // ── Payment helpers ────────────────────────────────────────────────────────────
 const PAYMENT_INFO: Record<string, { icon: string; label: string; color: string }> = {
@@ -19,6 +20,12 @@ const PAYMENT_METHODS: { value: PaymentMethod; label: string; icon: string; colo
   { value: "tunai",    label: "Tunai",    icon: "💵", color: "#057A55" },
   { value: "transfer", label: "Transfer", icon: "🏦", color: "#1C64F2" },
   { value: "qris",     label: "QRIS",     icon: "📱", color: "#7C3AED" },
+];
+
+const BUYER_TYPES: { value: BuyerType; label: string; icon: string }[] = [
+  { value: "walk_in",    label: "Beli di Toko",   icon: "🏪" },
+  { value: "cafe",       label: "Cafe / Reseller", icon: "☕" },
+  { value: "individual", label: "Perorangan",      icon: "👤" },
 ];
 
 function PaymentBadge({ method }: { method: string }) {
@@ -94,7 +101,6 @@ function LunasModal({
         </>
       }
     >
-      {/* Info transaksi */}
       <div style={{ background: "var(--surface2)", borderRadius: "var(--radius-sm)", padding: "14px 16px", marginBottom: "20px" }}>
         {tx.buyer_name && (
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "8px" }}>
@@ -161,6 +167,300 @@ function LunasModal({
   );
 }
 
+// ── Modal Edit Transaksi ───────────────────────────────────────────────────────
+function EditTransactionModal({
+  tx, onSave, onClose, processing,
+}: {
+  tx: Transaction;
+  onSave: (data: {
+    payment_method?: string;
+    payment_status?: string;
+    cash_received?: number | null;
+    buyer_type?: string;
+    buyer_name?: string | null;
+  }) => void;
+  onClose: () => void;
+  processing: boolean;
+}) {
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(tx.payment_method as PaymentMethod);
+  const [paymentStatus, setPaymentStatus] = useState(tx.payment_status);
+  const [buyerType, setBuyerType]         = useState<BuyerType>(tx.buyer_type as BuyerType);
+  const [buyerName, setBuyerName]         = useState(tx.buyer_name || "");
+  const [cashInput, setCashInput]         = useState(tx.cash_received ? tx.cash_received.toLocaleString("id-ID") : "");
+
+  const formatCashInput = (val: string) => {
+    const num = val.replace(/\D/g, "");
+    return num ? parseInt(num).toLocaleString("id-ID") : "";
+  };
+
+  const cashAmount = parseInt(cashInput.replace(/\D/g, "")) || 0;
+  const needsBuyerName = buyerType !== "walk_in";
+
+  const handleSave = () => {
+    onSave({
+      payment_method: paymentMethod,
+      payment_status: paymentStatus,
+      cash_received:  paymentMethod === "tunai" && cashAmount > 0 ? cashAmount : null,
+      buyer_type:     buyerType,
+      buyer_name:     needsBuyerName && buyerName.trim() ? buyerName.trim() : null,
+    });
+  };
+
+  return (
+    <Modal
+      title="✏️ Edit Transaksi"
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn btn-ghost" onClick={onClose} disabled={processing}>Batal</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={processing}>
+            {processing ? "⏳ Menyimpan..." : "💾 Simpan Perubahan"}
+          </button>
+        </>
+      }
+    >
+      {/* Info transaksi */}
+      <div style={{
+        background: "var(--surface2)", borderRadius: "var(--radius-sm)",
+        padding: "12px 16px", marginBottom: "20px", fontSize: "13px",
+        display: "flex", justifyContent: "space-between",
+      }}>
+        <div>
+          <div style={{ color: "var(--text2)", marginBottom: "2px" }}>Tanggal</div>
+          <div style={{ fontWeight: 600 }}>{formatDateTime(tx.created_at)}</div>
+        </div>
+        <div style={{ textAlign: "right" }}>
+          <div style={{ color: "var(--text2)", marginBottom: "2px" }}>Total</div>
+          <div style={{ fontWeight: 800, fontFamily: "'JetBrains Mono', monospace", color: "var(--primary)" }}>
+            {formatRupiah(tx.total_amount)}
+          </div>
+        </div>
+      </div>
+
+      {/* Items summary */}
+      <div style={{
+        background: "var(--surface2)", borderRadius: "var(--radius-sm)",
+        padding: "12px 16px", marginBottom: "20px",
+      }}>
+        <div style={{ fontSize: "12px", fontWeight: 600, color: "var(--text2)", marginBottom: "8px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+          Item Transaksi
+        </div>
+        {tx.items.map((item) => (
+          <div key={item.id} style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "4px" }}>
+            <span>{item.product_name} × {item.quantity}</span>
+            <span className="td-mono" style={{ color: "var(--text2)" }}>{formatRupiah(item.subtotal)}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Tipe Pembeli */}
+      <div className="form-group">
+        <label className="form-label">👥 Tipe Pembeli</label>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
+          {BUYER_TYPES.map((bt) => (
+            <button
+              key={bt.value}
+              onClick={() => { setBuyerType(bt.value); if (bt.value === "walk_in") setBuyerName(""); }}
+              style={{
+                padding: "10px 6px", borderRadius: "10px", fontFamily: "inherit",
+                cursor: "pointer", textAlign: "center", transition: "all 0.15s",
+                border: `2px solid ${buyerType === bt.value ? "var(--primary)" : "var(--border)"}`,
+                background: buyerType === bt.value ? "var(--primary-light)" : "var(--surface)",
+              }}
+            >
+              <div style={{ fontSize: "18px", marginBottom: "2px" }}>{bt.icon}</div>
+              <div style={{ fontSize: "11px", fontWeight: 700, color: buyerType === bt.value ? "var(--primary)" : "var(--text2)" }}>
+                {bt.label}
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {needsBuyerName && (
+        <div className="form-group">
+          <label className="form-label">
+            {buyerType === "cafe" ? "☕ Nama Cafe / Toko" : "👤 Nama Pemesan"}
+            <span style={{ color: "var(--text3)", fontWeight: 400, marginLeft: "6px" }}>(opsional)</span>
+          </label>
+          <input
+            className="form-input"
+            value={buyerName}
+            onChange={(e) => setBuyerName(e.target.value)}
+            placeholder={buyerType === "cafe" ? "Contoh: Cafe Melati" : "Contoh: Budi Santoso"}
+          />
+        </div>
+      )}
+
+      <div className="divider" />
+
+      {/* Status Pembayaran */}
+      <div className="form-group">
+        <label className="form-label">💳 Status Pembayaran</label>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+          <button
+            onClick={() => setPaymentStatus("paid")}
+            style={{
+              padding: "12px", borderRadius: "10px", fontFamily: "inherit",
+              cursor: "pointer", textAlign: "center", transition: "all 0.15s",
+              border: `2px solid ${paymentStatus === "paid" ? "#057A55" : "var(--border)"}`,
+              background: paymentStatus === "paid" ? "#DEF7EC" : "var(--surface)",
+            }}
+          >
+            <div style={{ fontSize: "18px", marginBottom: "2px" }}>✅</div>
+            <div style={{ fontSize: "12px", fontWeight: 700, color: paymentStatus === "paid" ? "#057A55" : "var(--text)" }}>
+              Lunas
+            </div>
+          </button>
+          <button
+            onClick={() => setPaymentStatus("pending")}
+            style={{
+              padding: "12px", borderRadius: "10px", fontFamily: "inherit",
+              cursor: "pointer", textAlign: "center", transition: "all 0.15s",
+              border: `2px solid ${paymentStatus === "pending" ? "#D97706" : "var(--border)"}`,
+              background: paymentStatus === "pending" ? "#FEF3C7" : "var(--surface)",
+            }}
+          >
+            <div style={{ fontSize: "18px", marginBottom: "2px" }}>🕐</div>
+            <div style={{ fontSize: "12px", fontWeight: 700, color: paymentStatus === "pending" ? "#D97706" : "var(--text)" }}>
+              Belum Lunas
+            </div>
+          </button>
+        </div>
+      </div>
+
+      {/* Metode Bayar — hanya jika lunas */}
+      {paymentStatus === "paid" && (
+        <div className="form-group">
+          <label className="form-label">💵 Metode Pembayaran</label>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
+            {PAYMENT_METHODS.map((m) => (
+              <button
+                key={m.value}
+                onClick={() => { setPaymentMethod(m.value); setCashInput(""); }}
+                style={{
+                  padding: "12px 6px", borderRadius: "10px", fontFamily: "inherit",
+                  cursor: "pointer", textAlign: "center", transition: "all 0.15s",
+                  border: `2px solid ${paymentMethod === m.value ? m.color : "var(--border)"}`,
+                  background: paymentMethod === m.value ? `${m.color}18` : "var(--surface)",
+                }}
+              >
+                <div style={{ fontSize: "18px", marginBottom: "2px" }}>{m.icon}</div>
+                <div style={{ fontSize: "11px", fontWeight: 700, color: paymentMethod === m.value ? m.color : "var(--text2)" }}>
+                  {m.label}
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {paymentMethod === "tunai" && (
+            <div style={{ marginTop: "12px" }}>
+              <label className="form-label">Uang Diterima (opsional)</label>
+              <input
+                className="form-input"
+                inputMode="numeric"
+                placeholder="Masukkan jumlah uang..."
+                value={cashInput}
+                onChange={(e) => setCashInput(formatCashInput(e.target.value))}
+                style={{ fontSize: "15px", fontWeight: 700 }}
+              />
+              {cashAmount > 0 && (
+                <div style={{ marginTop: "6px", fontSize: "12px", color: "var(--text3)" }}>
+                  Kembalian: <strong style={{ color: cashAmount >= tx.total_amount ? "var(--success)" : "var(--danger)" }}>
+                    {formatRupiah(Math.abs(cashAmount - tx.total_amount))}
+                  </strong>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+// ── Modal Konfirmasi Hapus ─────────────────────────────────────────────────────
+function DeleteTransactionModal({
+  tx, onConfirm, onClose, processing,
+}: {
+  tx: Transaction;
+  onConfirm: () => void;
+  onClose: () => void;
+  processing: boolean;
+}) {
+  return (
+    <Modal
+      title="🗑️ Hapus Transaksi"
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn btn-ghost" onClick={onClose} disabled={processing}>Batal</button>
+          <button className="btn btn-danger" onClick={onConfirm} disabled={processing}>
+            {processing ? "⏳ Menghapus..." : "🗑️ Ya, Hapus & Restock"}
+          </button>
+        </>
+      }
+    >
+      <div style={{ textAlign: "center", padding: "8px 0 16px" }}>
+        <div style={{ fontSize: "48px", marginBottom: "12px" }}>⚠️</div>
+        <p style={{ fontWeight: 700, fontSize: "16px", marginBottom: "8px" }}>
+          Yakin ingin menghapus transaksi ini?
+        </p>
+        <p style={{ color: "var(--text2)", fontSize: "13px", marginBottom: "16px" }}>
+          Tindakan ini tidak bisa dibatalkan.
+        </p>
+      </div>
+
+      {/* Info transaksi */}
+      <div style={{
+        background: "var(--surface2)", borderRadius: "var(--radius-sm)",
+        padding: "14px 16px", marginBottom: "16px",
+      }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "6px" }}>
+          <span className="text-muted">Tanggal</span>
+          <span style={{ fontWeight: 600 }}>{formatDateTime(tx.created_at)}</span>
+        </div>
+        {tx.buyer_name && (
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "6px" }}>
+            <span className="text-muted">Pembeli</span>
+            <span style={{ fontWeight: 600 }}>{tx.buyer_name}</span>
+          </div>
+        )}
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "6px" }}>
+          <span className="text-muted">Total</span>
+          <span style={{ fontWeight: 800, fontFamily: "'JetBrains Mono', monospace", color: "var(--primary)" }}>
+            {formatRupiah(tx.total_amount)}
+          </span>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px" }}>
+          <span className="text-muted">Status</span>
+          <PaymentStatusBadge status={tx.payment_status} />
+        </div>
+      </div>
+
+      {/* Item yang akan di-restock */}
+      <div style={{
+        background: "#DEF7EC", border: "1px solid #6EE7B7",
+        borderRadius: "var(--radius-sm)", padding: "12px 16px",
+      }}>
+        <div style={{ fontSize: "12px", fontWeight: 700, color: "#057A55", marginBottom: "8px" }}>
+          ✅ Stok berikut akan dikembalikan:
+        </div>
+        {tx.items.map((item) => (
+          <div key={item.id} style={{
+            display: "flex", justifyContent: "space-between",
+            fontSize: "13px", color: "#057A55", marginBottom: "3px",
+          }}>
+            <span>{item.product_name}</span>
+            <span style={{ fontWeight: 700 }}>+{item.quantity} pcs</span>
+          </div>
+        ))}
+      </div>
+    </Modal>
+  );
+}
+
+// ── Main Component ─────────────────────────────────────────────────────────────
 interface ReportsClientProps {
   initialTransactions: Transaction[];
   initialExpenses: Expense[];
@@ -179,9 +479,20 @@ export default function ReportsClient({
   const [viewTx, setViewTx]             = useState<Transaction | null>(null);
   const [filterStatus, setFilterStatus] = useState<"all" | "paid" | "pending">("all");
 
-  // ── Lunas modal state ──────────────────────────────────────────────────────
-  const [lunasModal, setLunasModal]         = useState<Transaction | null>(null);
-  const [lunasProcessing, setLunasProcessing] = useState(false);
+  // Modal states
+  const [lunasModal,       setLunasModal]       = useState<Transaction | null>(null);
+  const [lunasProcessing,  setLunasProcessing]  = useState(false);
+  const [editModal,        setEditModal]        = useState<Transaction | null>(null);
+  const [editProcessing,   setEditProcessing]   = useState(false);
+  const [deleteModal,      setDeleteModal]      = useState<Transaction | null>(null);
+  const [deleteProcessing, setDeleteProcessing] = useState(false);
+
+  // Toast notification
+  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
+  const showToast = (msg: string, type: "success" | "error" = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3500);
+  };
 
   const loadData = async (from: string, to: string) => {
     setLoading(true);
@@ -199,7 +510,7 @@ export default function ReportsClient({
     }
   };
 
-  // ── Tandai Lunas handler ───────────────────────────────────────────────────
+  // ── Tandai Lunas ──────────────────────────────────────────────────────────
   const handleLunas = async (method: PaymentMethod, cashReceived?: number) => {
     if (!lunasModal) return;
     setLunasProcessing(true);
@@ -211,24 +522,83 @@ export default function ReportsClient({
         body: JSON.stringify({ payment_method: method, cash_received: cashReceived }),
       });
       const data = await res.json();
-      if (!data.success) { alert(data.error || "Gagal update"); return; }
+      if (!data.success) { showToast(data.error || "Gagal update", "error"); return; }
 
-      // Update state lokal
       setTransactions((prev) =>
         prev.map((t) => t.id === lunasModal.id ? { ...t, ...data.data } : t)
       );
-      // Update viewTx jika sedang dibuka
       if (viewTx && viewTx.id === lunasModal.id) setViewTx(data.data);
       setLunasModal(null);
+      showToast("Transaksi berhasil ditandai lunas ✅");
     } catch {
-      alert("Gagal menghubungi server");
+      showToast("Gagal menghubungi server", "error");
     } finally {
       setLunasProcessing(false);
     }
   };
 
-  // ── Kalkulasi summary (hanya transaksi LUNAS untuk profit/sales) ───────────
-  const paidTx = useMemo(() => transactions.filter((t) => t.payment_status === "paid"), [transactions]);
+  // ── Edit Transaksi ────────────────────────────────────────────────────────
+  const handleEdit = async (editData: {
+    payment_method?: string;
+    payment_status?: string;
+    cash_received?: number | null;
+    buyer_type?: string;
+    buyer_name?: string | null;
+  }) => {
+    if (!editModal) return;
+    setEditProcessing(true);
+    try {
+      const res = await fetch(`/api/transactions/${editModal.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(editData),
+      });
+      const data = await res.json();
+      if (!data.success) { showToast(data.error || "Gagal edit", "error"); return; }
+
+      setTransactions((prev) =>
+        prev.map((t) => t.id === editModal.id ? { ...t, ...data.data } : t)
+      );
+      if (viewTx && viewTx.id === editModal.id) setViewTx({ ...viewTx, ...data.data });
+      setEditModal(null);
+      showToast("Transaksi berhasil diperbarui ✏️");
+    } catch {
+      showToast("Gagal menghubungi server", "error");
+    } finally {
+      setEditProcessing(false);
+    }
+  };
+
+  // ── Hapus Transaksi ───────────────────────────────────────────────────────
+  const handleDelete = async () => {
+    if (!deleteModal) return;
+    setDeleteProcessing(true);
+    try {
+      const res = await fetch(`/api/transactions/${deleteModal.id}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!data.success) { showToast(data.error || "Gagal hapus", "error"); return; }
+
+      setTransactions((prev) => prev.filter((t) => t.id !== deleteModal.id));
+      if (viewTx && viewTx.id === deleteModal.id) setViewTx(null);
+      setDeleteModal(null);
+
+      const restockSummary = data.restocked
+        ?.map((r: { product_name: string; qty: number }) => `${r.product_name} +${r.qty}`)
+        .join(", ");
+      showToast(`Transaksi dihapus. Stok dikembalikan: ${restockSummary}`);
+    } catch {
+      showToast("Gagal menghubungi server", "error");
+    } finally {
+      setDeleteProcessing(false);
+    }
+  };
+
+  // ── Kalkulasi summary ─────────────────────────────────────────────────────
+  const paidTx    = useMemo(() => transactions.filter((t) => t.payment_status === "paid"), [transactions]);
   const pendingTx = useMemo(() => transactions.filter((t) => t.payment_status === "pending"), [transactions]);
 
   const totalSales    = useMemo(() => paidTx.reduce((s, t) => s + t.total_amount, 0), [paidTx]);
@@ -236,14 +606,13 @@ export default function ReportsClient({
   const totalDiscount = useMemo(() => paidTx.reduce((s, t) => s + t.total_discount, 0), [paidTx]);
   const grossProfit   = useMemo(() => paidTx.reduce((s, t) => s + t.total_profit, 0), [paidTx]);
   const STOCK_CAT = "Pembelian Stok";
-  const totalOpex          = useMemo(() => expenses.filter((e) => e.category !== STOCK_CAT).reduce((s, e) => s + e.amount, 0), [expenses]);
-  const totalStockPurchase = useMemo(() => expenses.filter((e) => e.category === STOCK_CAT).reduce((s, e) => s + e.amount, 0), [expenses]);
-  const totalExpenses      = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
-  const netProfit          = grossProfit - totalOpex;
+  const totalOpex           = useMemo(() => expenses.filter((e) => e.category !== STOCK_CAT).reduce((s, e) => s + e.amount, 0), [expenses]);
+  const totalStockPurchase  = useMemo(() => expenses.filter((e) => e.category === STOCK_CAT).reduce((s, e) => s + e.amount, 0), [expenses]);
+  const totalExpenses       = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
+  const netProfit           = grossProfit - totalOpex;
   const netProfitAfterStock = grossProfit - totalExpenses;
-  const avgMargin          = totalSales > 0 ? Math.round((grossProfit / totalSales) * 100) : 0;
+  const avgMargin           = totalSales > 0 ? Math.round((grossProfit / totalSales) * 100) : 0;
 
-  // ── Payment method breakdown (hanya paid) ─────────────────────────────────
   const paymentBreakdown = useMemo(() => {
     const map: Record<string, { count: number; total: number }> = {};
     for (const t of paidTx) {
@@ -255,7 +624,6 @@ export default function ReportsClient({
     return map;
   }, [paidTx]);
 
-  // ── Filter transaksi untuk tabel ──────────────────────────────────────────
   const filteredTx = useMemo(() => {
     if (filterStatus === "all") return transactions;
     return transactions.filter((t) => t.payment_status === filterStatus);
@@ -263,6 +631,20 @@ export default function ReportsClient({
 
   return (
     <div>
+      {/* Toast notification */}
+      {toast && (
+        <div style={{
+          position: "fixed", bottom: "24px", left: "50%", transform: "translateX(-50%)",
+          zIndex: 2000, padding: "12px 20px", borderRadius: "var(--radius-sm)",
+          background: toast.type === "success" ? "#057A55" : "#C81E1E",
+          color: "#fff", fontSize: "14px", fontWeight: 600,
+          boxShadow: "var(--shadow-lg)", animation: "slideUp 0.2s ease",
+          whiteSpace: "nowrap", maxWidth: "90vw", overflowX: "hidden", textOverflow: "ellipsis",
+        }}>
+          {toast.msg}
+        </div>
+      )}
+
       {/* Date filter */}
       <div className="card" style={{ marginBottom: "20px" }}>
         <div className="card-body">
@@ -295,7 +677,7 @@ export default function ReportsClient({
         </div>
       )}
 
-      {/* Stats — hanya dari transaksi lunas */}
+      {/* Stats */}
       <div className="stats-grid" style={{ marginBottom: "20px" }}>
         <div className="stat-card blue">
           <div className="stat-label">Total Penjualan (Lunas)</div>
@@ -323,7 +705,7 @@ export default function ReportsClient({
         </div>
       </div>
 
-      {/* Hutang summary card */}
+      {/* Hutang summary */}
       {pendingTx.length > 0 && (
         <div className="card" style={{ marginBottom: "20px" }}>
           <div className="card-body" style={{ padding: "16px 20px" }}>
@@ -404,7 +786,6 @@ export default function ReportsClient({
       <div className="card" style={{ marginBottom: "20px" }}>
         <div className="card-header">
           <div className="card-title">📋 Riwayat Transaksi ({transactions.length})</div>
-          {/* Filter status */}
           <div style={{ display: "flex", gap: "8px" }}>
             {(["all", "paid", "pending"] as const).map((s) => (
               <button
@@ -430,7 +811,7 @@ export default function ReportsClient({
                 <th>Diskon</th>
                 <th>Total</th>
                 <th>Profit</th>
-                <th></th>
+                <th style={{ minWidth: "140px" }}>Aksi</th>
               </tr>
             </thead>
             <tbody>
@@ -465,16 +846,29 @@ export default function ReportsClient({
                     {tx.payment_status === "pending" ? "—" : formatRupiah(tx.total_profit)}
                   </td>
                   <td>
-                    <div style={{ display: "flex", gap: "6px" }}>
+                    <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
                       <button className="btn btn-ghost btn-sm" onClick={() => setViewTx(tx)}>Detail</button>
                       {tx.payment_status === "pending" && (
-                        <button
-                          className="btn btn-success btn-sm"
-                          onClick={() => setLunasModal(tx)}
-                        >
+                        <button className="btn btn-success btn-sm" onClick={() => setLunasModal(tx)}>
                           ✅ Lunas
                         </button>
                       )}
+                      <button
+                        className="btn-icon"
+                        onClick={() => setEditModal(tx)}
+                        title="Edit transaksi"
+                        style={{ padding: "7px" }}
+                      >
+                        <EditIcon size={14} />
+                      </button>
+                      <button
+                        className="btn-icon danger"
+                        onClick={() => setDeleteModal(tx)}
+                        title="Hapus transaksi"
+                        style={{ padding: "7px" }}
+                      >
+                        <TrashIcon size={14} />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -520,24 +914,28 @@ export default function ReportsClient({
           footer={
             <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", width: "100%" }}>
               {viewTx.payment_status === "pending" && (
-                <button className="btn btn-success" onClick={() => { setLunasModal(viewTx); }}>
+                <button className="btn btn-success" onClick={() => setLunasModal(viewTx)}>
                   ✅ Tandai Lunas
                 </button>
               )}
+              <button className="btn btn-ghost btn-sm" onClick={() => { setEditModal(viewTx); setViewTx(null); }}>
+                <EditIcon size={14} /> Edit
+              </button>
+              <button className="btn-icon danger" onClick={() => { setDeleteModal(viewTx); setViewTx(null); }} title="Hapus">
+                <TrashIcon size={14} />
+              </button>
               <button className="btn btn-ghost" onClick={() => printViaRawBT(viewTx)}>🖨️ Cetak Struk</button>
               <button className="btn btn-primary" onClick={() => setViewTx(null)}>Tutup</button>
             </div>
           }
         >
           <div className="receipt">
-            {/* Header */}
             <div style={{ textAlign: "center", marginBottom: "12px" }}>
               <div style={{ fontWeight: 700, fontSize: "15px" }}>KHK FROZEN FOOD</div>
               <div style={{ color: "var(--text3)", fontSize: "12px" }}>{formatDateTime(viewTx.created_at)}</div>
               <div style={{ color: "var(--text3)", fontSize: "11px", marginTop: "2px" }}>ID: {viewTx.id.slice(0, 8)}...</div>
             </div>
 
-            {/* Status & buyer */}
             <div style={{ display: "flex", justifyContent: "center", gap: "8px", marginBottom: "12px", flexWrap: "wrap" }}>
               <PaymentStatusBadge status={viewTx.payment_status} />
               <BuyerTypeBadge type={viewTx.buyer_type} name={viewTx.buyer_name} />
@@ -545,7 +943,6 @@ export default function ReportsClient({
 
             <div className="receipt-divider" />
 
-            {/* Items */}
             {(viewTx.items || []).map((item) => (
               <div key={item.id} style={{ marginBottom: "10px", fontSize: "13px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
@@ -568,7 +965,6 @@ export default function ReportsClient({
 
             <div className="receipt-divider" />
 
-            {/* Totals */}
             {viewTx.total_discount > 0 && (
               <div style={{ display: "flex", justifyContent: "space-between", color: "var(--warning)", marginBottom: "6px", fontSize: "13px" }}>
                 <span>Total Diskon</span>
@@ -629,6 +1025,26 @@ export default function ReportsClient({
           onConfirm={handleLunas}
           onClose={() => setLunasModal(null)}
           processing={lunasProcessing}
+        />
+      )}
+
+      {/* Edit Modal */}
+      {editModal && (
+        <EditTransactionModal
+          tx={editModal}
+          onSave={handleEdit}
+          onClose={() => setEditModal(null)}
+          processing={editProcessing}
+        />
+      )}
+
+      {/* Delete Modal */}
+      {deleteModal && (
+        <DeleteTransactionModal
+          tx={deleteModal}
+          onConfirm={handleDelete}
+          onClose={() => setDeleteModal(null)}
+          processing={deleteProcessing}
         />
       )}
     </div>
