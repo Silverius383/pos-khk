@@ -17,6 +17,9 @@ interface TransactionsClientProps {
   initialProducts: Product[];
 }
 
+// ── GoSend virtual product ID (tidak ada di DB) ────────────────────────────────
+const GOSEND_ID = "__gosend__";
+
 const PAYMENT_METHODS: { value: PaymentMethod; label: string; icon: string; color: string }[] = [
   { value: "tunai",    label: "Tunai",    icon: "💵", color: "#057A55" },
   { value: "transfer", label: "Transfer", icon: "🏦", color: "#1C64F2" },
@@ -53,6 +56,132 @@ function BuyerTypeBadge({ type }: { type: BuyerType }) {
     }}>
       {b.icon} {b.label}
     </span>
+  );
+}
+
+// ── GoSend Price Input Modal ───────────────────────────────────────────────────
+function GoSendModal({
+  onConfirm,
+  onClose,
+}: {
+  onConfirm: (price: number) => void;
+  onClose: () => void;
+}) {
+  const [displayPrice, setDisplayPrice] = useState("");
+  const [error, setError] = useState("");
+
+  const numericPrice = parseInt(displayPrice.replace(/\./g, "").replace(/[^0-9]/g, "")) || 0;
+
+  const handlePriceChange = (val: string) => {
+    const raw = val.replace(/[^0-9]/g, "");
+    const num = parseInt(raw) || 0;
+    setDisplayPrice(raw ? num.toLocaleString("id-ID") : "");
+    setError("");
+  };
+
+  const handleConfirm = () => {
+    if (!numericPrice || numericPrice <= 0) {
+      setError("Harga GoSend wajib diisi");
+      return;
+    }
+    onConfirm(numericPrice);
+  };
+
+  return (
+    <Modal
+      title="🛵 Tambah GoSend"
+      onClose={onClose}
+      footer={
+        <>
+          <button className="btn btn-ghost" onClick={onClose}>Batal</button>
+          <button className="btn btn-primary" onClick={handleConfirm}>
+            Tambah ke Keranjang
+          </button>
+        </>
+      }
+    >
+      {/* Visual GoSend tile preview */}
+      <div style={{
+        background: "linear-gradient(135deg, #FFF7ED 0%, #FED7AA 100%)",
+        border: "2px solid #F97316",
+        borderRadius: "var(--radius)",
+        padding: "20px",
+        textAlign: "center",
+        marginBottom: "20px",
+      }}>
+        <div style={{ fontSize: "36px", marginBottom: "6px" }}>🛵</div>
+        <div style={{ fontWeight: 700, fontSize: "15px", color: "#C2410C" }}>GoSend</div>
+        <div style={{ fontSize: "12px", color: "#9A3412", marginTop: "2px" }}>Ongkos kirim sesuai tarif saat ini</div>
+      </div>
+
+      <div className="form-group" style={{ marginBottom: 0 }}>
+        <label className="form-label">Harga GoSend (Rp) *</label>
+        <div style={{ position: "relative" }}>
+          <span style={{
+            position: "absolute", left: "14px", top: "50%",
+            transform: "translateY(-50%)", color: "var(--text3)",
+            fontWeight: 700, fontSize: "14px", pointerEvents: "none",
+            fontFamily: "'IBM Plex Mono', monospace",
+          }}>
+            Rp
+          </span>
+          <input
+            className="form-input"
+            style={{
+              paddingLeft: "42px",
+              fontSize: "20px",
+              fontWeight: 800,
+              fontFamily: "'IBM Plex Mono', monospace",
+              textAlign: "right",
+            }}
+            type="text"
+            inputMode="numeric"
+            value={displayPrice}
+            onChange={(e) => handlePriceChange(e.target.value)}
+            placeholder="0"
+            autoFocus
+            onKeyDown={(e) => e.key === "Enter" && handleConfirm()}
+          />
+        </div>
+        {numericPrice > 0 && (
+          <div style={{ marginTop: "6px", fontSize: "12px", color: "var(--text3)", textAlign: "right" }}>
+            {formatRupiah(numericPrice)}
+          </div>
+        )}
+        {error && (
+          <div className="alert alert-danger" style={{ marginTop: "10px", marginBottom: 0 }}>
+            {error}
+          </div>
+        )}
+      </div>
+
+      {/* Quick amount shortcuts */}
+      <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginTop: "16px" }}>
+        {[5000, 8000, 10000, 15000, 20000, 25000].map((amt) => (
+          <button
+            key={amt}
+            onClick={() => {
+              setDisplayPrice(amt.toLocaleString("id-ID"));
+              setError("");
+            }}
+            style={{
+              padding: "6px 12px",
+              borderRadius: "99px",
+              border: `1.5px solid ${numericPrice === amt ? "#F97316" : "var(--border)"}`,
+              background: numericPrice === amt ? "#FFF7ED" : "var(--surface2)",
+              color: numericPrice === amt ? "#C2410C" : "var(--text2)",
+              fontWeight: 600,
+              fontSize: "12px",
+              cursor: "pointer",
+              fontFamily: "'IBM Plex Mono', monospace",
+              transition: "all 0.15s",
+            }}
+          >
+            {formatRupiah(amt)}
+          </button>
+        ))}
+      </div>
+    </Modal>
   );
 }
 
@@ -140,7 +269,7 @@ function DiscountModal({
   );
 }
 
-// ── Payment Modal (3-step: tipe pembeli → status bayar → metode) ───────────────
+// ── Payment Modal ──────────────────────────────────────────────────────────────
 function PaymentModal({
   totalFinal, onConfirm, onClose, processing,
 }: {
@@ -202,7 +331,6 @@ function PaymentModal({
         </>
       }
     >
-      {/* Total */}
       <div style={{
         background: "var(--surface2)", borderRadius: "var(--radius-sm)",
         padding: "16px", textAlign: "center", marginBottom: "20px",
@@ -213,7 +341,6 @@ function PaymentModal({
         </div>
       </div>
 
-      {/* STEP 1: Tipe Pembeli */}
       <div className="form-group">
         <label className="form-label">👥 Tipe Pembeli</label>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px" }}>
@@ -238,7 +365,6 @@ function PaymentModal({
         </div>
       </div>
 
-      {/* Nama pemesan — hanya muncul jika cafe/individual */}
       {needsBuyerName && (
         <div className="form-group">
           <label className="form-label">
@@ -257,7 +383,6 @@ function PaymentModal({
 
       <div className="divider" />
 
-      {/* STEP 2: Status Pembayaran */}
       <div className="form-group">
         <label className="form-label">💳 Status Pembayaran</label>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
@@ -304,7 +429,6 @@ function PaymentModal({
         )}
       </div>
 
-      {/* STEP 3: Metode Bayar — hanya tampil jika bayar sekarang */}
       {payStatus === "paid" && (
         <div className="form-group">
           <label className="form-label">💵 Metode Pembayaran</label>
@@ -328,7 +452,6 @@ function PaymentModal({
             ))}
           </div>
 
-          {/* Kalkulator kembalian */}
           {selected === "tunai" && (
             <div className="form-group" style={{ marginTop: "12px", marginBottom: 0 }}>
               <label className="form-label">Uang Diterima (opsional)</label>
@@ -423,7 +546,6 @@ function LunasModal({
         </>
       }
     >
-      {/* Info transaksi */}
       <div style={{ background: "var(--surface2)", borderRadius: "var(--radius-sm)", padding: "14px 16px", marginBottom: "20px" }}>
         {tx.buyer_name && (
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: "13px", marginBottom: "8px" }}>
@@ -506,6 +628,11 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
   const [lunasModal, setLunasModal]       = useState<Transaction | null>(null);
   const [lunasProcessing, setLunasProcessing] = useState(false);
 
+  // GoSend modal state
+  const [goSendModal, setGoSendModal] = useState(false);
+
+  const hasGoSendInCart = cart.some((i) => i.product_id === GOSEND_ID);
+
   const categories = useMemo(
     () => ["Semua", ...Array.from(new Set(products.map((p) => p.category).filter(Boolean)))],
     [products]
@@ -537,7 +664,30 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
     });
   };
 
+  // ── Tambah GoSend ke keranjang ─────────────────────────────────────────────
+  const addGoSendToCart = (price: number) => {
+    setCart((prev) => {
+      // Replace jika sudah ada (seharusnya tidak terjadi karena tombol disabled)
+      const filtered = prev.filter((i) => i.product_id !== GOSEND_ID);
+      return [...filtered, {
+        product_id:     GOSEND_ID,
+        product_name:   "GoSend",
+        sell_price:     price,
+        buy_price:      0,         // tidak ada HPP untuk ongkir
+        quantity:       1,
+        max_qty:        1,         // maksimal 1
+        discount_type:  "none",
+        discount_value: 0,
+        discount_amount: 0,
+        final_price:    price,
+      }];
+    });
+    setGoSendModal(false);
+  };
+
   const updateQty = (productId: string, delta: number) => {
+    // GoSend tidak bisa diubah qty-nya
+    if (productId === GOSEND_ID) return;
     setCart((prev) =>
       prev.map((i) => {
         if (i.product_id !== productId) return i;
@@ -579,6 +729,10 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
     setProcessing(true);
     setError("");
 
+    // Pisahkan item GoSend dari item produk biasa
+    const productItems = cart.filter((i) => i.product_id !== GOSEND_ID);
+    const goSendItem   = cart.find((i) => i.product_id === GOSEND_ID);
+
     try {
       const res = await fetch("/api/transactions", {
         method: "POST",
@@ -590,7 +744,9 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
           payment_status: opts.paymentStatus,
           buyer_type:     opts.buyerType,
           buyer_name:     opts.buyerName || null,
-          items: cart.map((i) => ({
+          // GoSend dikirim sebagai metadata tambahan (opsional, untuk API yang mendukung)
+          gosend_fee:     goSendItem ? goSendItem.final_price : null,
+          items: productItems.map((i) => ({
             product_id:     i.product_id,
             quantity:       i.quantity,
             discount_type:  i.discount_type,
@@ -602,12 +758,43 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
       const data = await res.json();
       if (!data.success) { setError(data.error || "Gagal memproses transaksi"); return; }
 
+      // Update stok lokal hanya untuk produk nyata (bukan GoSend)
       setProducts((prev) => prev.map((p) => {
-        const item = cart.find((i) => i.product_id === p.id);
+        const item = productItems.find((i) => i.product_id === p.id);
         return item ? { ...p, stock: p.stock - item.quantity } : p;
       }));
 
-      setReceipt(data.data);
+      // Inject GoSend ke dalam receipt untuk ditampilkan dan dicetak
+      const enrichedReceipt: Transaction = {
+        ...data.data,
+        items: goSendItem
+          ? [
+              ...data.data.items,
+              // GoSend sebagai item virtual di receipt (tidak ada di DB)
+              {
+                id:              "__gosend_item__",
+                transaction_id:  data.data.id,
+                product_id:      GOSEND_ID,
+                product_name:    "GoSend",
+                quantity:        1,
+                sell_price:      goSendItem.final_price,
+                buy_price:       0,
+                discount_type:   "none",
+                discount_value:  0,
+                discount_amount: 0,
+                final_price:     goSendItem.final_price,
+                subtotal:        goSendItem.final_price,
+                profit:          0,
+              },
+            ]
+          : data.data.items,
+        // Adjust total untuk menyertakan GoSend
+        total_amount: goSendItem
+          ? data.data.total_amount + goSendItem.final_price
+          : data.data.total_amount,
+      };
+
+      setReceipt(enrichedReceipt);
       setCart([]);
       setPaymentModal(false);
       setSheetOpen(false);
@@ -632,7 +819,6 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
       const data = await res.json();
       if (!data.success) { alert(data.error || "Gagal update"); return; }
 
-      // Update receipt kalau sedang dibuka
       if (receipt && receipt.id === lunasModal.id) setReceipt(data.data);
       setLunasModal(null);
       router.refresh();
@@ -654,34 +840,60 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
       ) : (
         <div className="cart-items">
           {cart.map((item) => {
+            const isGoSend        = item.product_id === GOSEND_ID;
             const hasItemDiscount = item.discount_type !== "none" && item.discount_amount > 0;
             return (
-              <div key={item.product_id} className="cart-item">
+              <div key={item.product_id} className="cart-item" style={{
+                // GoSend: subtle orange accent
+                borderLeft: isGoSend ? "3px solid #F97316" : undefined,
+              }}>
                 <div className="cart-item-info">
-                  <div className="cart-item-name">{item.product_name}</div>
-                  <div className="cart-item-price">
-                    {formatRupiah(item.final_price)} × {item.quantity} ={" "}
-                    <strong>{formatRupiah(item.final_price * item.quantity)}</strong>
+                  <div className="cart-item-name">
+                    {isGoSend && <span style={{ marginRight: "4px" }}>🛵</span>}
+                    {item.product_name}
+                    {isGoSend && (
+                      <span className="badge badge-gray" style={{ marginLeft: "6px", fontSize: "10px" }}>Ongkir</span>
+                    )}
                   </div>
-                  {hasItemDiscount ? (
-                    <span className="badge badge-warning" style={{ fontSize: "11px" }}>
-                      🏷️ Diskon {item.discount_type === "percent" ? `${item.discount_value}%` : formatRupiah(item.discount_value)}
-                      {" (−"}{formatRupiah(item.discount_amount * item.quantity)}{")"}
-                    </span>
-                  ) : (
-                    <span style={{ fontSize: "11px", color: "var(--text3)" }}>Tidak ada diskon</span>
+                  <div className="cart-item-price">
+                    {formatRupiah(item.final_price)}
+                    {!isGoSend && ` × ${item.quantity} = `}
+                    {!isGoSend && <strong>{formatRupiah(item.final_price * item.quantity)}</strong>}
+                  </div>
+                  {!isGoSend && (
+                    <>
+                      {hasItemDiscount ? (
+                        <span className="badge badge-warning" style={{ fontSize: "11px" }}>
+                          🏷️ Diskon {item.discount_type === "percent" ? `${item.discount_value}%` : formatRupiah(item.discount_value)}
+                          {" (−"}{formatRupiah(item.discount_amount * item.quantity)}{")"}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: "11px", color: "var(--text3)" }}>Tidak ada diskon</span>
+                      )}
+                      <button className="btn btn-ghost btn-sm" style={{ padding: "4px 10px", fontSize: "12px" }}
+                        onClick={() => setDiscountModal(item)}>
+                        <EditIcon size={12} /> {hasItemDiscount ? "Ubah" : "Tambah"} Diskon
+                      </button>
+                    </>
                   )}
-                  <button className="btn btn-ghost btn-sm" style={{ padding: "4px 10px", fontSize: "12px" }}
-                    onClick={() => setDiscountModal(item)}>
-                    <EditIcon size={12} /> {hasItemDiscount ? "Ubah" : "Tambah"} Diskon
-                  </button>
+                  {isGoSend && (
+                    <button
+                      className="btn btn-ghost btn-sm"
+                      style={{ padding: "4px 10px", fontSize: "12px" }}
+                      onClick={() => setGoSendModal(true)}
+                    >
+                      ✏️ Ubah Harga
+                    </button>
+                  )}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
-                  <div className="cart-qty">
-                    <button className="qty-btn" onClick={() => updateQty(item.product_id, -1)}>−</button>
-                    <span className="qty-val">{item.quantity}</span>
-                    <button className="qty-btn" onClick={() => updateQty(item.product_id, +1)}>+</button>
-                  </div>
+                  {!isGoSend && (
+                    <div className="cart-qty">
+                      <button className="qty-btn" onClick={() => updateQty(item.product_id, -1)}>−</button>
+                      <span className="qty-val">{item.quantity}</span>
+                      <button className="qty-btn" onClick={() => updateQty(item.product_id, +1)}>+</button>
+                    </div>
+                  )}
                   <button style={{ background: "none", border: "none", cursor: "pointer", color: "var(--danger)", padding: "4px" }}
                     onClick={() => removeItem(item.product_id)}>
                     <TrashIcon size={16} />
@@ -758,6 +970,44 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
           </div>
           <div className="product-grid-wrap">
             <div className="product-grid">
+
+              {/* ── GoSend Tile (virtual) ── */}
+              <div
+                className={`product-tile ${hasGoSendInCart ? "out" : ""}`}
+                onClick={() => !hasGoSendInCart && setGoSendModal(true)}
+                style={{
+                  background: hasGoSendInCart
+                    ? "var(--surface2)"
+                    : "linear-gradient(135deg, #FFF7ED 0%, #FFEDD5 100%)",
+                  border: `2px solid ${hasGoSendInCart ? "var(--border)" : "#F97316"}`,
+                  position: "relative",
+                }}
+              >
+                {hasGoSendInCart && (
+                  <div style={{ position: "absolute", top: 6, left: 6 }}>
+                    <span className="badge badge-success" style={{ fontSize: "9px", padding: "2px 6px" }}>✓ Ditambah</span>
+                  </div>
+                )}
+                <div className="product-tile-cat" style={{ color: "#C2410C", background: "#FED7AA" }}>
+                  Pengiriman
+                </div>
+                <div style={{ fontSize: "28px", marginBottom: "4px" }}>🛵</div>
+                <div className="product-tile-name" style={{ color: hasGoSendInCart ? "var(--text3)" : "#C2410C" }}>
+                  GoSend
+                </div>
+                <div style={{
+                  fontSize: "11px",
+                  color: hasGoSendInCart ? "var(--text3)" : "#9A3412",
+                  marginTop: "2px",
+                  fontStyle: "italic",
+                }}>
+                  {hasGoSendInCart
+                    ? `${formatRupiah(cart.find((i) => i.product_id === GOSEND_ID)?.final_price ?? 0)}`
+                    : "Harga sesuai tarif"}
+                </div>
+              </div>
+
+              {/* ── Produk biasa ── */}
               {filtered.map((p) => {
                 const inCart = cart.find((i) => i.product_id === p.id);
                 const isOut  = p.stock <= 0;
@@ -838,6 +1088,14 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
         <div className="sheet-footer"><CartFooter /></div>
       </div>
 
+      {/* ── GoSend Modal ── */}
+      {goSendModal && (
+        <GoSendModal
+          onConfirm={addGoSendToCart}
+          onClose={() => setGoSendModal(false)}
+        />
+      )}
+
       {/* ── Modal Checkout ── */}
       {paymentModal && (
         <PaymentModal
@@ -877,7 +1135,6 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
               <div style={{ color: "var(--text3)", fontSize: "12px" }}>{formatDateTime(receipt.created_at)}</div>
             </div>
 
-            {/* Status & buyer info */}
             <div style={{ display: "flex", justifyContent: "center", gap: "8px", marginBottom: "12px", flexWrap: "wrap" }}>
               <PaymentStatusBadge status={receipt.payment_status} />
               <BuyerTypeBadge type={receipt.buyer_type} />
@@ -893,18 +1150,26 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
             {receipt.items.map((item) => (
               <div key={item.id} style={{ marginBottom: "10px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between" }}>
-                  <span style={{ fontWeight: 600 }}>{item.product_name}</span>
+                  <span style={{ fontWeight: 600 }}>
+                    {item.product_id === GOSEND_ID && "🛵 "}
+                    {item.product_name}
+                    {item.product_id === GOSEND_ID && (
+                      <span style={{ fontWeight: 400, color: "var(--text3)", fontSize: "11px", marginLeft: "4px" }}>(Ongkir)</span>
+                    )}
+                  </span>
                   <span style={{ fontWeight: 700 }}>{formatRupiah(item.subtotal)}</span>
                 </div>
-                <div style={{ fontSize: "11px", color: "var(--text3)" }}>
-                  {item.quantity} × {formatRupiah(item.sell_price)}
-                  {item.discount_type !== "none" && item.discount_amount > 0 && (
-                    <span style={{ color: "var(--warning)", marginLeft: "8px" }}>
-                      🏷️ Diskon {item.discount_type === "percent" ? `${item.discount_value}%` : formatRupiah(item.discount_value)}
-                      {" (−"}{formatRupiah(item.discount_amount * item.quantity)}{")"}
-                    </span>
-                  )}
-                </div>
+                {item.product_id !== GOSEND_ID && (
+                  <div style={{ fontSize: "11px", color: "var(--text3)" }}>
+                    {item.quantity} × {formatRupiah(item.sell_price)}
+                    {item.discount_type !== "none" && item.discount_amount > 0 && (
+                      <span style={{ color: "var(--warning)", marginLeft: "8px" }}>
+                        🏷️ Diskon {item.discount_type === "percent" ? `${item.discount_value}%` : formatRupiah(item.discount_value)}
+                        {" (−"}{formatRupiah(item.discount_amount * item.quantity)}{")"}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
 
