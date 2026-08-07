@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { Product, Transaction } from "@/types";
 import { formatRupiah } from "@/utils/currency";
 import { formatDateTime, isExpired } from "@/utils/date";
@@ -126,23 +127,31 @@ function TxDetailModal({ tx, onClose }: { tx: Transaction; onClose: () => void }
 interface DashboardClientProps {
   stats: {
     today_sales: number;
-    today_profit: number;       // gross profit - biaya operasional (exclude pembelian stok)
+    today_discount: number;
+    today_expenses: number;
+    today_profit: number;
     today_tx_count: number;
+    today_new_hutang_count: number;
+    today_new_hutang_amount: number;
     month_sales: number;
-    month_profit: number;       // gross profit - biaya operasional (exclude pembelian stok)
-    month_profit_after_stock: number; // gross profit - semua pengeluaran termasuk stok
+    month_profit: number;
+    month_profit_after_stock: number;
     month_tx_count: number;
-    month_opex: number;         // biaya operasional saja
-    month_stock_purchase: number; // pembelian stok
+    month_opex: number;
+    month_stock_purchase: number;
   };
   lowStockProducts: Product[];
   recentTransactions: Transaction[];
+  todayHutang: Transaction[];
+  salesTrend: { date: string; total: number; count: number }[];
 }
 
-export default function DashboardClient({ stats, lowStockProducts, recentTransactions }: DashboardClientProps) {
+export default function DashboardClient({ stats, lowStockProducts, recentTransactions, todayHutang, salesTrend }: DashboardClientProps) {
   const [viewTx, setViewTx]                 = useState<Transaction | null>(null);
   const [stockSearch, setStockSearch]       = useState("");
   const [stockCatFilter, setStockCatFilter] = useState("Semua");
+  const [showRingkasan, setShowRingkasan]   = useState(false);
+  const [trendRange, setTrendRange]         = useState<7 | 30>(30);
 
   const expiredProds = lowStockProducts.filter((p) => isExpired(p.expired_date));
 
@@ -162,6 +171,58 @@ export default function DashboardClient({ stats, lowStockProducts, recentTransac
 
   return (
     <div>
+      {/* Ringkasan Hari Ini Modal */}
+      {showRingkasan && (
+        <Modal title="📋 Ringkasan Hari Ini" onClose={() => setShowRingkasan(false)}
+          footer={<button className="btn btn-primary" onClick={() => setShowRingkasan(false)}>Tutup</button>}>
+          <div style={{ fontSize: "13px", color: "var(--text3)", marginBottom: "16px", textAlign: "center" }}>
+            {new Date().toLocaleDateString("id-ID", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
+          </div>
+          {/* Summary rows */}
+          {[
+            { label: "Total Transaksi",    value: `${stats.today_tx_count} transaksi`,          color: "var(--text)" },
+            { label: "Total Penjualan",    value: formatRupiah(stats.today_sales),              color: "var(--primary)" },
+            { label: "Total Diskon",       value: formatRupiah(stats.today_discount),            color: "var(--warning)" },
+            { label: "Total Pengeluaran",  value: formatRupiah(stats.today_expenses),            color: "var(--danger)" },
+            { label: "Profit Bersih",      value: formatRupiah(stats.today_profit),              color: stats.today_profit >= 0 ? "var(--success)" : "var(--danger)" },
+          ].map(({ label, value, color }) => (
+            <div key={label} style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+              padding: "10px 0", borderBottom: "1px solid var(--border)",
+            }}>
+              <span style={{ color: "var(--text2)", fontSize: "14px" }}>{label}</span>
+              <span style={{ fontWeight: 700, fontFamily: "'JetBrains Mono', monospace", color, fontSize: "14px" }}>{value}</span>
+            </div>
+          ))}
+          {/* Hutang baru hari ini */}
+          {stats.today_new_hutang_count > 0 && (
+            <div style={{ marginTop: "16px" }}>
+              <div style={{
+                padding: "10px 14px", borderRadius: "var(--radius-sm)",
+                background: "#FEF3C7", border: "1px solid #FCD34D",
+                marginBottom: "8px",
+              }}>
+                <div style={{ fontWeight: 700, color: "#92400E", fontSize: "13px", marginBottom: "4px" }}>
+                  🕐 Hutang Baru Hari Ini: {stats.today_new_hutang_count} transaksi ({formatRupiah(stats.today_new_hutang_amount)})
+                </div>
+              </div>
+              {todayHutang.map((t) => (
+                <div key={t.id} style={{
+                  display: "flex", justifyContent: "space-between", alignItems: "center",
+                  padding: "7px 10px", borderRadius: "var(--radius-sm)",
+                  background: "var(--surface2)", marginBottom: "4px", fontSize: "13px",
+                }}>
+                  <span style={{ fontWeight: 600 }}>{t.buyer_name || "Pembeli Langsung"}</span>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", color: "var(--warning)", fontWeight: 700 }}>
+                    {formatRupiah(t.total_amount)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Modal>
+      )}
+
       {/* Alerts */}
       {(expiredProds.length > 0 || lowStockProducts.length > 0) && (
         <div style={{ marginBottom: "20px", display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -181,6 +242,12 @@ export default function DashboardClient({ stats, lowStockProducts, recentTransac
       )}
 
       {/* Stats */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+        <div style={{ fontSize: "13px", color: "var(--text3)", fontWeight: 600 }}>Hari Ini</div>
+        <button className="btn btn-ghost btn-sm" onClick={() => setShowRingkasan(true)}>
+          📋 Ringkasan Hari Ini
+        </button>
+      </div>
       <div className="stats-grid">
         <div className="stat-card blue">
           <div className="stat-label">Penjualan Hari Ini</div>
@@ -251,7 +318,7 @@ export default function DashboardClient({ stats, lowStockProducts, recentTransac
                     )}
                   </div>
                   {stockCategories.length > 2 && (
-                    <div className="filter-bar" style={{ gap: "6px", marginBottom: 0 }}>
+                    <div className="filter-bar" style={{ gap: "6px", marginBottom: 0, flexWrap: "wrap" }}>
                       {stockCategories.map((c) => (
                         <button
                           key={c}
@@ -310,8 +377,8 @@ export default function DashboardClient({ stats, lowStockProducts, recentTransac
                   <thead>
                     <tr>
                       <th>Waktu</th>
-                      <th>Pembeli</th>
-                      <th>Bayar</th>
+                      <th className="col-hide-mobile">Pembeli</th>
+                      <th className="col-hide-mobile">Bayar</th>
                       <th>Status</th>
                       <th>Total</th>
                       <th></th>
@@ -321,12 +388,12 @@ export default function DashboardClient({ stats, lowStockProducts, recentTransac
                     {recentTransactions.map((t) => (
                       <tr key={t.id} style={{ background: t.payment_status === "pending" ? "#FFFBEB" : undefined }}>
                         <td className="text-muted" style={{ fontSize: "12px" }}>{formatDateTime(t.created_at)}</td>
-                        <td style={{ fontSize: "12px" }}>
+                        <td className="col-hide-mobile" style={{ fontSize: "12px" }}>
                           {t.buyer_name
                             ? <span style={{ fontWeight: 600 }}>{t.buyer_name}</span>
                             : <span style={{ color: "var(--text3)" }}>—</span>}
                         </td>
-                        <td><PaymentBadge method={t.payment_method} /></td>
+                        <td className="col-hide-mobile"><PaymentBadge method={t.payment_method} /></td>
                         <td>
                           {t.payment_status === "pending"
                             ? <span className="badge badge-warning" style={{ fontSize: "10px" }}>🕐 Hutang</span>
@@ -347,6 +414,68 @@ export default function DashboardClient({ stats, lowStockProducts, recentTransac
       </div>
 
       {viewTx && <TxDetailModal tx={viewTx} onClose={() => setViewTx(null)} />}
+
+      {/* Grafik Tren Penjualan */}
+      <div className="card" style={{ marginTop: "20px" }}>
+        <div className="card-header">
+          <div className="card-title">📈 Tren Penjualan</div>
+          <div style={{ display: "flex", gap: "6px" }}>
+            {([7, 30] as const).map((d) => (
+              <button key={d}
+                className={`tag${trendRange === d ? " active" : ""}`}
+                style={{ fontSize: "12px", padding: "4px 12px" }}
+                onClick={() => setTrendRange(d)}>
+                {d} Hari
+              </button>
+            ))}
+          </div>
+        </div>
+        <div style={{ padding: "16px 8px 8px" }}>
+          {salesTrend.length === 0 ? (
+            <div style={{ textAlign: "center", padding: "40px", color: "var(--text3)", fontSize: "13px" }}>
+              Belum ada data penjualan
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={200}>
+              <BarChart
+                data={salesTrend.slice(-(trendRange))}
+                margin={{ top: 4, right: 8, left: 0, bottom: 4 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 10, fill: "var(--text3)" }}
+                  tickFormatter={(v: string) => {
+                    const d = new Date(v + "T00:00:00");
+                    return d.toLocaleDateString("id-ID", { day: "numeric", month: "short" });
+                  }}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  tick={{ fontSize: 10, fill: "var(--text3)" }}
+                  tickFormatter={(v: number) => v >= 1000000 ? `${(v/1000000).toFixed(1)}jt` : v >= 1000 ? `${(v/1000).toFixed(0)}rb` : String(v)}
+                  tickLine={false}
+                  axisLine={false}
+                  width={44}
+                />
+                <Tooltip
+                  formatter={(value: number) => formatRupiah(value)}
+                  labelFormatter={(label: string) => {
+                    const d = new Date(label + "T00:00:00");
+                    return d.toLocaleDateString("id-ID", { weekday: "short", day: "numeric", month: "long" });
+                  }}
+                  contentStyle={{
+                    background: "var(--surface)", border: "1px solid var(--border)",
+                    borderRadius: "8px", fontSize: "12px",
+                  }}
+                />
+                <Bar dataKey="total" fill="var(--primary)" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

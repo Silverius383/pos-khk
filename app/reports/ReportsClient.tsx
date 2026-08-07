@@ -7,7 +7,7 @@ import { formatRupiah } from "@/utils/currency";
 import { formatDateTime } from "@/utils/date";
 import Modal from "@/components/ui/Modal";
 import { printViaRawBT } from "@/utils/printReceipt";
-import { TrashIcon, EditIcon } from "@/components/ui/Icons";
+import { TrashIcon, EditIcon, SearchIcon } from "@/components/ui/Icons";
 import { PAYMENT_METHODS, BUYER_TYPES, STOCK_PURCHASE_CATEGORY } from "@/lib/constants";
 
 // ── Payment helpers ────────────────────────────────────────────────────────────
@@ -476,6 +476,7 @@ export default function ReportsClient({
   const [loading, setLoading]           = useState(false);
   const [viewTx, setViewTx]             = useState<Transaction | null>(null);
   const [filterStatus, setFilterStatus] = useState<"all" | "paid" | "pending">("all");
+  const [searchName, setSearchName]     = useState("");
 
   // Modal states
   const [lunasModal,       setLunasModal]       = useState<Transaction | null>(null);
@@ -623,9 +624,12 @@ export default function ReportsClient({
   }, [paidTx]);
 
   const filteredTx = useMemo(() => {
-    if (filterStatus === "all") return transactions;
-    return transactions.filter((t) => t.payment_status === filterStatus);
-  }, [transactions, filterStatus]);
+    return transactions.filter((t) => {
+      const matchStatus = filterStatus === "all" || t.payment_status === filterStatus;
+      const matchName   = !searchName || (t.buyer_name ?? "").toLowerCase().includes(searchName.toLowerCase());
+      return matchStatus && matchName;
+    });
+  }, [transactions, filterStatus, searchName]);
 
   return (
     <div>
@@ -650,17 +654,22 @@ export default function ReportsClient({
           <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px" }}>
             {(() => {
               const now   = new Date();
-              const today = now.toISOString().split("T")[0];
-              const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay() + 1);
-              const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+              // fmt lokal — hindari toISOString() yang UTC dan mundur 1 hari di Jakarta
+              const fmt = (d: Date) =>
+                `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+              const today = fmt(now);
+              // Senin sebagai hari pertama minggu — handle Sunday (getDay()=0) khusus
+              const day = now.getDay();
+              const startOfWeek = new Date(now);
+              startOfWeek.setDate(now.getDate() - (day === 0 ? 6 : day - 1));
+              const startOfMonth     = new Date(now.getFullYear(), now.getMonth(), 1);
               const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
               const endOfLastMonth   = new Date(now.getFullYear(), now.getMonth(), 0);
-              const fmt = (d: Date) => d.toISOString().split("T")[0];
               const presets = [
-                { label: "Hari ini",    from: today,                  to: today },
-                { label: "Minggu ini",  from: fmt(startOfWeek),       to: today },
-                { label: "Bulan ini",   from: fmt(startOfMonth),      to: today },
-                { label: "Bulan lalu",  from: fmt(startOfLastMonth),  to: fmt(endOfLastMonth) },
+                { label: "Hari ini",    from: today,                    to: today },
+                { label: "Minggu ini",  from: fmt(startOfWeek),         to: today },
+                { label: "Bulan ini",   from: fmt(startOfMonth),        to: today },
+                { label: "Bulan lalu",  from: fmt(startOfLastMonth),    to: fmt(endOfLastMonth) },
               ];
               return presets.map((p) => (
                 <button
@@ -811,9 +820,27 @@ export default function ReportsClient({
 
       {/* Transactions table */}
       <div className="card" style={{ marginBottom: "20px" }}>
-        <div className="card-header">
-          <div className="card-title">📋 Riwayat Transaksi ({transactions.length})</div>
-          <div style={{ display: "flex", gap: "8px" }}>
+        <div className="card-header" style={{ flexWrap: "wrap", gap: "10px" }}>
+          <div className="card-title">📋 Riwayat Transaksi ({filteredTx.length}/{transactions.length})</div>
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+            {/* Search by name */}
+            <div className="search-wrap" style={{ width: "180px", minWidth: "140px" }}>
+              <span className="search-icon"><SearchIcon size={14} /></span>
+              <input
+                className="form-input"
+                placeholder="Cari nama pembeli..."
+                value={searchName}
+                onChange={(e) => setSearchName(e.target.value)}
+                style={{ fontSize: "12px", padding: "5px 8px 5px 28px", paddingRight: searchName ? "28px" : undefined }}
+              />
+              {searchName && (
+                <button onClick={() => setSearchName("")} style={{
+                  position: "absolute", right: "6px", top: "50%", transform: "translateY(-50%)",
+                  background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: "14px", lineHeight: 1,
+                }}>✕</button>
+              )}
+            </div>
+            {/* Status filter */}
             {(["all", "paid", "pending"] as const).map((s) => (
               <button
                 key={s}

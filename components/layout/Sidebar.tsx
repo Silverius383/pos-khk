@@ -5,14 +5,15 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   SnowflakeIcon, DashboardIcon, CartIcon, ProductIcon,
-  ExpenseIcon, ReportIcon, LogoutIcon, RestockIcon,
+  ExpenseIcon, ReportIcon, LogoutIcon, RestockIcon, DebtIcon,
 } from "@/components/ui/Icons";
 
 const NAV_ITEMS = [
   { href: "/dashboard",    label: "Dashboard",       Icon: DashboardIcon },
   { href: "/transactions", label: "Kasir / POS",     Icon: CartIcon },
   { href: "/products",     label: "Produk",          Icon: ProductIcon },
-  { href: "/restock",      label: "Restock Produk",      Icon: RestockIcon },
+  { href: "/restock",      label: "Restock Produk",  Icon: RestockIcon },
+  { href: "/hutang",       label: "Hutang",          Icon: DebtIcon },
   { href: "/expenses",     label: "Pengeluaran",     Icon: ExpenseIcon },
   { href: "/reports",      label: "Laporan",         Icon: ReportIcon },
 ];

@@ -115,3 +115,10 @@ export const MenuIcon = ({ size = 24 }: IconProps) => (
     <line x1="3" y1="18" x2="21" y2="18"/>
   </svg>
 );
+
+export const DebtIcon = ({ size = 20 }: IconProps) => (
+  <svg width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="10"/>
+    <polyline points="12,6 12,12 16,14"/>
+  </svg>
+);

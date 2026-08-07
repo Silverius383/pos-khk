@@ -16,7 +16,7 @@ export default async function DashboardPage() {
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
   try {
-    const [todayTx, monthTx, todayExp, monthExp, recentTransactions, allProducts] =
+    const [todayTx, monthTx, todayExp, monthExp, recentTransactions, allProducts, salesTrend] =
       await Promise.all([
         prisma.transaction.findMany({ where: { created_at: { gte: todayStart } } }),
         prisma.transaction.findMany({ where: { created_at: { gte: monthStart } } }),
@@ -31,6 +31,18 @@ export default async function DashboardPage() {
           where: { deleted_at: null },
           orderBy: { stock: "asc" },
         }),
+        // Tren penjualan 30 hari terakhir
+        prisma.$queryRaw<{ date: string; total: bigint; count: number }[]>`
+          SELECT
+            TO_CHAR(created_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD') AS date,
+            CAST(SUM(total_amount) AS BIGINT) AS total,
+            CAST(COUNT(*) AS INTEGER) AS count
+          FROM transactions
+          WHERE created_at >= NOW() - INTERVAL '30 days'
+            AND payment_status = 'paid'
+          GROUP BY TO_CHAR(created_at AT TIME ZONE 'Asia/Jakarta', 'YYYY-MM-DD')
+          ORDER BY date ASC
+        `,
       ]);
 
     const lowStockProducts = allProducts.filter((p) => p.stock <= p.min_stock);
@@ -47,15 +59,21 @@ export default async function DashboardPage() {
 
     const stats = {
       today_sales:              todayTx.reduce((s, t) => s + t.total_amount, 0),
+      today_discount:           todayTx.reduce((s, t) => s + t.total_discount, 0),
+      today_expenses:           todayExp.reduce((s, e) => s + e.amount, 0),
       today_profit:             todayGross - todayOpex,
       today_tx_count:           todayTx.length,
+      today_new_hutang_count:   todayTx.filter((t) => t.payment_status === "pending").length,
+      today_new_hutang_amount:  todayTx.filter((t) => t.payment_status === "pending").reduce((s, t) => s + t.total_amount, 0),
       month_sales:              monthTx.reduce((s, t) => s + t.total_amount, 0),
-      month_profit:             monthGross - monthOpex,             // profit operasional (exclude pembelian stok)
-      month_profit_after_stock: monthGross - monthOpex - monthStockPurchase, // setelah semua pengeluaran
+      month_profit:             monthGross - monthOpex,
+      month_profit_after_stock: monthGross - monthOpex - monthStockPurchase,
       month_tx_count:           monthTx.length,
       month_opex:               monthOpex,
       month_stock_purchase:     monthStockPurchase,
     };
+
+    const todayHutang = todayTx.filter((t) => t.payment_status === "pending");
 
     return (
       <AppLayout title="Dashboard" lowStockCount={lowStockProducts.length}>
@@ -63,6 +81,12 @@ export default async function DashboardPage() {
           stats={stats}
           lowStockProducts={JSON.parse(JSON.stringify(lowStockProducts))}
           recentTransactions={JSON.parse(JSON.stringify(recentTransactions))}
+          todayHutang={JSON.parse(JSON.stringify(todayHutang))}
+          salesTrend={salesTrend.map((r) => ({
+            date: r.date,
+            total: Number(r.total),
+            count: Number(r.count),
+          }))}
         />
       </AppLayout>
     );

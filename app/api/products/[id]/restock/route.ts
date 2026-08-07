@@ -15,10 +15,18 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { qty } = body;
+    const { qty, type = "increment", reason } = body;
 
     if (!qty || typeof qty !== "number" || !Number.isInteger(qty) || qty <= 0) {
       return NextResponse.json({ success: false, error: "Jumlah restock harus berupa bilangan bulat lebih dari 0" }, { status: 400 });
+    }
+
+    if (type !== "increment" && type !== "decrement") {
+      return NextResponse.json({ success: false, error: "Type harus increment atau decrement" }, { status: 400 });
+    }
+
+    if (type === "decrement" && (!reason || !reason.trim())) {
+      return NextResponse.json({ success: false, error: "Alasan koreksi wajib diisi" }, { status: 400 });
     }
 
     const product = await prisma.product.findFirst({ where: { id, deleted_at: null } });
@@ -26,14 +34,23 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: "Produk tidak ditemukan" }, { status: 404 });
     }
 
+    if (type === "decrement" && product.stock < qty) {
+      return NextResponse.json({ success: false, error: `Stok tidak cukup. Stok saat ini: ${product.stock}` }, { status: 400 });
+    }
+
     const updated = await prisma.product.update({
       where: { id },
-      data: { stock: { increment: qty } },
+      data: {
+        stock: type === "increment"
+          ? { increment: qty }
+          : { decrement: qty },
+      },
     });
 
     revalidatePath("/dashboard");
     revalidatePath("/products");
     revalidatePath("/transactions");
+    revalidatePath("/restock");
 
     return NextResponse.json({ success: true, data: updated });
   } catch (error) {
