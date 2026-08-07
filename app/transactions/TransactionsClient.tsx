@@ -13,6 +13,7 @@ import Modal from "@/components/ui/Modal";
 import { SearchIcon, TrashIcon, EditIcon } from "@/components/ui/Icons";
 import { printViaRawBT } from "@/utils/printReceipt";
 import { generateQrisString } from "@/utils/qris";
+import { PAYMENT_METHODS, BUYER_TYPES } from "@/lib/constants";
 
 interface TransactionsClientProps {
   initialProducts: Product[];
@@ -20,18 +21,6 @@ interface TransactionsClientProps {
 
 // ── GoSend virtual product ID (tidak ada di DB) ────────────────────────────────
 const GOSEND_ID = "__gosend__";
-
-const PAYMENT_METHODS: { value: PaymentMethod; label: string; icon: string; color: string }[] = [
-  { value: "tunai",    label: "Tunai",    icon: "💵", color: "#057A55" },
-  { value: "transfer", label: "Transfer", icon: "🏦", color: "#1C64F2" },
-  { value: "qris",     label: "QRIS",     icon: "📱", color: "#7C3AED" },
-];
-
-const BUYER_TYPES: { value: BuyerType; label: string; icon: string; desc: string }[] = [
-  { value: "walk_in",    label: "Beli di Toko",   icon: "🏪", desc: "Pembeli datang langsung" },
-  { value: "cafe",       label: "Cafe / Reseller", icon: "☕", desc: "Pemesanan dari cafe" },
-  { value: "individual", label: "Perorangan",      icon: "👤", desc: "Order personal" },
-];
 
 // ── Helper Badges ──────────────────────────────────────────────────────────────
 function PaymentStatusBadge({ status }: { status: "paid" | "pending" }) {
@@ -825,9 +814,8 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
     setProcessing(true);
     setError("");
 
-    // Pisahkan item GoSend dari item produk biasa
+    // Pisahkan item GoSend dari item produk biasa (hanya untuk validasi stok lokal)
     const productItems = cart.filter((i) => i.product_id !== GOSEND_ID);
-    const goSendItem   = cart.find((i) => i.product_id === GOSEND_ID);
 
     try {
       const res = await fetch("/api/transactions", {
@@ -840,13 +828,14 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
           payment_status: opts.paymentStatus,
           buyer_type:     opts.buyerType,
           buyer_name:     opts.buyerName || null,
-          // GoSend dikirim sebagai metadata tambahan (opsional, untuk API yang mendukung)
-          gosend_fee:     goSendItem ? goSendItem.final_price : null,
-          items: productItems.map((i) => ({
+          // Kirim semua item termasuk GoSend — API akan handle sentinel ID
+          items: cart.map((i) => ({
             product_id:     i.product_id,
             quantity:       i.quantity,
             discount_type:  i.discount_type,
             discount_value: i.discount_value,
+            // GoSend tidak ada di DB, sertakan harga langsung
+            ...(i.product_id === GOSEND_ID ? { sell_price: i.sell_price } : {}),
           })),
         }),
       });
@@ -860,37 +849,8 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
         return item ? { ...p, stock: p.stock - item.quantity } : p;
       }));
 
-      // Inject GoSend ke dalam receipt untuk ditampilkan dan dicetak
-      const enrichedReceipt: Transaction = {
-        ...data.data,
-        items: goSendItem
-          ? [
-              ...data.data.items,
-              // GoSend sebagai item virtual di receipt (tidak ada di DB)
-              {
-                id:              "__gosend_item__",
-                transaction_id:  data.data.id,
-                product_id:      GOSEND_ID,
-                product_name:    "GoSend",
-                quantity:        1,
-                sell_price:      goSendItem.final_price,
-                buy_price:       0,
-                discount_type:   "none",
-                discount_value:  0,
-                discount_amount: 0,
-                final_price:     goSendItem.final_price,
-                subtotal:        goSendItem.final_price,
-                profit:          0,
-              },
-            ]
-          : data.data.items,
-        // Adjust total untuk menyertakan GoSend
-        total_amount: goSendItem
-          ? data.data.total_amount + goSendItem.final_price
-          : data.data.total_amount,
-      };
-
-      setReceipt(enrichedReceipt);
+      // Receipt langsung dari DB — GoSend sudah tersimpan sebagai item nyata
+      setReceipt(data.data);
       setCart([]);
       setPaymentModal(false);
       setSheetOpen(false);

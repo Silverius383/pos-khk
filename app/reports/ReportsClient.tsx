@@ -8,25 +8,12 @@ import { formatDateTime } from "@/utils/date";
 import Modal from "@/components/ui/Modal";
 import { printViaRawBT } from "@/utils/printReceipt";
 import { TrashIcon, EditIcon } from "@/components/ui/Icons";
+import { PAYMENT_METHODS, BUYER_TYPES, STOCK_PURCHASE_CATEGORY } from "@/lib/constants";
 
 // ── Payment helpers ────────────────────────────────────────────────────────────
-const PAYMENT_INFO: Record<string, { icon: string; label: string; color: string }> = {
-  tunai:    { icon: "💵", label: "Tunai",    color: "#057A55" },
-  transfer: { icon: "🏦", label: "Transfer", color: "#1C64F2" },
-  qris:     { icon: "📱", label: "QRIS",     color: "#7C3AED" },
-};
-
-const PAYMENT_METHODS: { value: PaymentMethod; label: string; icon: string; color: string }[] = [
-  { value: "tunai",    label: "Tunai",    icon: "💵", color: "#057A55" },
-  { value: "transfer", label: "Transfer", icon: "🏦", color: "#1C64F2" },
-  { value: "qris",     label: "QRIS",     icon: "📱", color: "#7C3AED" },
-];
-
-const BUYER_TYPES: { value: BuyerType; label: string; icon: string }[] = [
-  { value: "walk_in",    label: "Beli di Toko",   icon: "🏪" },
-  { value: "cafe",       label: "Cafe / Reseller", icon: "☕" },
-  { value: "individual", label: "Perorangan",      icon: "👤" },
-];
+const PAYMENT_INFO: Record<string, { icon: string; label: string; color: string }> = Object.fromEntries(
+  PAYMENT_METHODS.map((m) => [m.value, { icon: m.icon, label: m.label, color: m.color }])
+);
 
 function PaymentBadge({ method }: { method: string }) {
   const p = PAYMENT_INFO[method] ?? PAYMENT_INFO.tunai;
@@ -605,9 +592,9 @@ export default function ReportsClient({
   const totalPending  = useMemo(() => pendingTx.reduce((s, t) => s + t.total_amount, 0), [pendingTx]);
   const totalDiscount = useMemo(() => paidTx.reduce((s, t) => s + t.total_discount, 0), [paidTx]);
   const grossProfit   = useMemo(() => paidTx.reduce((s, t) => s + t.total_profit, 0), [paidTx]);
-  const STOCK_CAT = "Pembelian Stok";
-  const totalOpex           = useMemo(() => expenses.filter((e) => e.category !== STOCK_CAT).reduce((s, e) => s + e.amount, 0), [expenses]);
-  const totalStockPurchase  = useMemo(() => expenses.filter((e) => e.category === STOCK_CAT).reduce((s, e) => s + e.amount, 0), [expenses]);
+  const STOCK_CAT = STOCK_PURCHASE_CATEGORY;
+  const totalOpex           = useMemo(() => expenses.filter((e) => e.category !== STOCK_CAT).reduce((s, e) => s + e.amount, 0), [expenses, STOCK_CAT]);
+  const totalStockPurchase  = useMemo(() => expenses.filter((e) => e.category === STOCK_CAT).reduce((s, e) => s + e.amount, 0), [expenses, STOCK_CAT]);
   const totalExpenses       = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
   const netProfit           = grossProfit - totalOpex;
   const netProfitAfterStock = grossProfit - totalExpenses;

@@ -17,8 +17,8 @@ export async function PATCH(
     const body = await request.json();
     const { qty } = body;
 
-    if (!qty || typeof qty !== "number" || qty <= 0) {
-      return NextResponse.json({ success: false, error: "Jumlah restock harus lebih dari 0" }, { status: 400 });
+    if (!qty || typeof qty !== "number" || !Number.isInteger(qty) || qty <= 0) {
+      return NextResponse.json({ success: false, error: "Jumlah restock harus berupa bilangan bulat lebih dari 0" }, { status: 400 });
     }
 
     const product = await prisma.product.findFirst({ where: { id, deleted_at: null } });

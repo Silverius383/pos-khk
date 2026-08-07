@@ -8,18 +8,11 @@ import { formatRupiah } from "@/utils/currency";
 import { formatDateTime, currentMonth, monthLabel } from "@/utils/date";
 import Modal from "@/components/ui/Modal";
 import { PlusIcon, TrashIcon, CheckIcon } from "@/components/ui/Icons";
+import { EXPENSE_CATEGORIES } from "@/lib/constants";
 
 interface ExpensesClientProps {
   initialExpenses: Expense[];
 }
-
-const EXPENSE_CATEGORIES = [
-  "Operasional",
-  "Pembelian Stok",
-  "Listrik",
-  "Transport",
-  "Lainnya",
-];
 
 export default function ExpensesClient({ initialExpenses }: ExpensesClientProps) {
   const router = useRouter();

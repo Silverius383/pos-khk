@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
 import { calculateDiscountAmount, calculateFinalPrice } from "@/utils/currency";
+import { revalidatePath } from "next/cache";
+
+const MAX_LIMIT = 500;
 
 export async function GET(request: NextRequest) {
   if (!(await requireAuth())) {
@@ -11,10 +14,10 @@ export async function GET(request: NextRequest) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const dateFrom       = searchParams.get("from");
-    const dateTo         = searchParams.get("to");
-    const limit          = parseInt(searchParams.get("limit") || "50");
-    const paymentStatus  = searchParams.get("payment_status"); // filter "pending" | "paid"
+    const dateFrom      = searchParams.get("from");
+    const dateTo        = searchParams.get("to");
+    const limit         = Math.min(parseInt(searchParams.get("limit") || "50") || 50, MAX_LIMIT);
+    const paymentStatus = searchParams.get("payment_status");
 
     const where: Record<string, unknown> = {};
     if (dateFrom || dateTo) {
@@ -51,8 +54,8 @@ export async function POST(request: NextRequest) {
       items,
       payment_method,
       cash_received,
-      payment_status = "paid",    // "paid" | "pending"
-      buyer_type     = "walk_in", // "walk_in" | "cafe" | "individual"
+      payment_status = "paid",
+      buyer_type     = "walk_in",
       buyer_name,
     } = body;
 
@@ -60,20 +63,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Keranjang belanja kosong" }, { status: 400 });
     }
 
-    const validMethods     = ["tunai", "transfer", "qris"];
-    const validBuyerTypes  = ["walk_in", "cafe", "individual"];
-    const validStatuses    = ["paid", "pending"];
+    const validMethods    = ["tunai", "transfer", "qris"];
+    const validBuyerTypes = ["walk_in", "cafe", "individual"];
+    const validStatuses   = ["paid", "pending"];
 
-    const method     = validMethods.includes(payment_method) ? payment_method : "tunai";
-    const buyerType  = validBuyerTypes.includes(buyer_type) ? buyer_type : "walk_in";
-    const payStatus  = validStatuses.includes(payment_status) ? payment_status : "paid";
+    const method    = validMethods.includes(payment_method) ? payment_method : "tunai";
+    const buyerType = validBuyerTypes.includes(buyer_type) ? buyer_type : "walk_in";
+    const payStatus = validStatuses.includes(payment_status) ? payment_status : "paid";
 
-    // buyer_name hanya boleh diisi jika bukan walk_in
     const resolvedBuyerName =
       buyerType !== "walk_in" && buyer_name ? buyer_name.trim() || null : null;
 
+    // Validasi setiap item sebelum masuk DB transaction
+    for (const item of items) {
+      if (!item.product_id || typeof item.product_id !== "string") {
+        return NextResponse.json({ success: false, error: "product_id tidak valid" }, { status: 400 });
+      }
+      if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+        return NextResponse.json({ success: false, error: "Quantity harus berupa bilangan bulat positif" }, { status: 400 });
+      }
+    }
+
     const transaction = await prisma.$transaction(async (tx) => {
-      const productIds = items.map((i: { product_id: string }) => i.product_id);
+      const productIds = items
+        .filter((i: { product_id: string }) => i.product_id !== "__gosend__")
+        .map((i: { product_id: string }) => i.product_id);
       const products   = await tx.product.findMany({ where: { id: { in: productIds } } });
       const productMap = new Map(products.map((p) => [p.id, p]));
 
@@ -83,6 +97,28 @@ export async function POST(request: NextRequest) {
       const itemsData   = [];
 
       for (const item of items) {
+        // ── GoSend: tidak ada di DB, product_id null ─────────────────────────
+        if (item.product_id === "__gosend__") {
+          const fee = parseInt(item.sell_price) || 0;
+          if (fee <= 0) continue;
+          totalAmount += fee;
+          itemsData.push({
+            product_id:      null,
+            product_name:    "GoSend",
+            quantity:        1,
+            sell_price:      fee,
+            buy_price:       0,
+            discount_type:   "none",
+            discount_value:  0,
+            discount_amount: 0,
+            final_price:     fee,
+            subtotal:        fee,
+            profit:          0,
+          });
+          continue;
+        }
+
+        // ── Produk biasa ─────────────────────────────────────────────────────
         const product = productMap.get(item.product_id);
         if (!product) throw new Error(`Produk tidak ditemukan`);
         if (product.stock < item.quantity) {
@@ -132,18 +168,24 @@ export async function POST(request: NextRequest) {
         include: { items: true },
       });
 
-      // Stok SELALU dikurangi, baik bayar sekarang maupun nanti
+      // Stok hanya dikurangi untuk produk nyata (bukan GoSend)
       await Promise.all(
-        items.map((item: { product_id: string; quantity: number }) =>
-          tx.product.update({
-            where: { id: item.product_id },
-            data:  { stock: { decrement: item.quantity } },
-          })
-        )
+        items
+          .filter((item: { product_id: string }) => item.product_id !== "__gosend__")
+          .map((item: { product_id: string; quantity: number }) =>
+            tx.product.update({
+              where: { id: item.product_id },
+              data:  { stock: { decrement: item.quantity } },
+            })
+          )
       );
 
       return newTransaction;
     });
+
+    revalidatePath("/dashboard");
+    revalidatePath("/reports");
+    revalidatePath("/products");
 
     return NextResponse.json({ success: true, data: transaction }, { status: 201 });
   } catch (error) {

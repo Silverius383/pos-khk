@@ -79,18 +79,12 @@ export function buildReceiptString(tx: Transaction): string {
   s += divider();
 
   // ── Info Pembeli ───────────────────────────────────────────────────────────
-  // Selalu tampilkan tipe pembeli
   const buyerTypeLabel = BUYER_TYPE_LABEL[tx.buyer_type] ?? "Toko";
   s += row("Pembeli", buyerTypeLabel);
 
-  // Tampilkan nama jika ada (cafe / perorangan)
   if (tx.buyer_name && tx.buyer_name.trim()) {
     s += E.BOLD_ON + row("Nama", tx.buyer_name.trim()) + E.BOLD_OFF;
   }
-
-  // Status pembayaran
-  // const statusLabel = tx.payment_status === "paid" ? "LUNAS" : "BELUM LUNAS (HUTANG)";
-  // s += row("Status", statusLabel);
 
   s += divider();
 
@@ -124,12 +118,8 @@ export function buildReceiptString(tx: Transaction): string {
     if (tx.payment_method === "tunai" && tx.cash_received) {
       s += row("Uang Diterima", formatRp(tx.cash_received));
       const change = tx.cash_received - tx.total_amount;
-      s += E.BOLD_ON + row("Kembalian", formatRp(change)) + E.BOLD_OFF;
+      s += E.BOLD_ON + row("Kembalian", formatRp(Math.abs(change))) + E.BOLD_OFF;
     }
-  } else {
-    // Transaksi hutang — tampilkan pesan
-    // s += E.BOLD_ON + center("** BELUM DIBAYAR **") + E.BOLD_OFF;
-    // s += E.FONT_SMALL + center("Harap segera dilunasi") + E.FONT_NORMAL;
   }
 
   s += divider();

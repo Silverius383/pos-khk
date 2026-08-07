@@ -9,13 +9,6 @@ export function formatRupiah(amount: number): string {
   }).format(amount || 0);
 }
 
-export function formatRupiahShort(amount: number): string {
-  if (amount >= 1_000_000_000) return `Rp ${(amount / 1_000_000_000).toFixed(1)}M`;
-  if (amount >= 1_000_000) return `Rp ${(amount / 1_000_000).toFixed(1)}jt`;
-  if (amount >= 1_000) return `Rp ${(amount / 1_000).toFixed(0)}rb`;
-  return formatRupiah(amount);
-}
-
 export function calculateMarginPercent(sellPrice: number, buyPrice: number): number {
   if (buyPrice === 0) return 0;
   return Math.round(((sellPrice - buyPrice) / buyPrice) * 100);

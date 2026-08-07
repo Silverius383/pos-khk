@@ -39,7 +39,7 @@ export type BuyerType     = "walk_in" | "cafe" | "individual";
 export interface TransactionItem {
   id: string;
   transaction_id: string;
-  product_id: string;
+  product_id: string | null;  // null untuk fee item seperti GoSend
   product_name: string;
   quantity: number;
   sell_price: number;

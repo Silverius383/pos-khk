@@ -24,6 +24,9 @@ model Product {
 
   transaction_items TransactionItem[]
 
+  @@index([deleted_at])
+  @@index([category])
+  @@index([stock])
   @@map("products")
 }
 
@@ -52,13 +55,15 @@ model Transaction {
 
   items TransactionItem[]
 
+  @@index([created_at])
+  @@index([payment_status])
   @@map("transactions")
 }
 
 model TransactionItem {
   id             String @id @default(uuid())
   transaction_id String
-  product_id     String
+  product_id     String?   // nullable untuk fee item seperti GoSend
   product_name   String
   quantity       Int
   sell_price     Int
@@ -70,9 +75,11 @@ model TransactionItem {
   subtotal       Int
   profit         Int
 
-  transaction Transaction @relation(fields: [transaction_id], references: [id], onDelete: Cascade)
-  product     Product     @relation(fields: [product_id], references: [id])
+  transaction Transaction  @relation(fields: [transaction_id], references: [id], onDelete: Cascade)
+  product     Product?     @relation(fields: [product_id], references: [id])
 
+  @@index([transaction_id])
+  @@index([product_id])
   @@map("transaction_items")
 }
 
@@ -83,6 +90,8 @@ model Expense {
   category   String   @default("Operasional")
   created_at DateTime @default(now())
 
+  @@index([created_at])
+  @@index([category])
   @@map("expenses")
 }
 

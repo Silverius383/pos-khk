@@ -41,7 +41,9 @@ export function currentMonth(): string {
 
 export function isExpired(date: string | Date | null | undefined): boolean {
   if (!date) return false;
-  return new Date(date) < new Date();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return new Date(date) < today;
 }
 
 export function isNearExpiry(date: string | Date | null | undefined, days = 7): boolean {

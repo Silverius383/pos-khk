@@ -28,13 +28,16 @@ export async function PATCH(
     const body = await request.json().catch(() => ({}));
     const { payment_method, cash_received } = body;
 
+    const validMethods = ["tunai", "transfer", "qris"];
+    const resolvedMethod = validMethods.includes(payment_method) ? payment_method : undefined;
+
     const updated = await prisma.transaction.update({
       where: { id },
       data: {
         payment_status: "paid",
         paid_at:        new Date(),
-        ...(payment_method ? { payment_method } : {}),
-        ...(cash_received  ? { cash_received }  : {}),
+        ...(resolvedMethod  ? { payment_method: resolvedMethod } : {}),
+        ...(cash_received   ? { cash_received }                  : {}),
       },
       include: { items: true },
     });
@@ -148,17 +151,18 @@ export async function DELETE(
 
     // Kembalikan stok untuk setiap item
     await prisma.$transaction(async (tx) => {
-      // Restock semua produk
+      // Restock semua produk nyata (skip GoSend yang product_id-nya null)
       await Promise.all(
-        existing.items.map((item) =>
-          tx.product.update({
-            where: { id: item.product_id },
-            data:  { stock: { increment: item.quantity } },
-          }).catch(() => {
-            // Produk mungkin sudah dihapus (soft delete), skip saja
-            console.warn(`Produk ${item.product_id} tidak ditemukan saat restock, skip.`);
-          })
-        )
+        existing.items
+          .filter((item) => item.product_id !== null)
+          .map((item) =>
+            tx.product.update({
+              where: { id: item.product_id! },
+              data:  { stock: { increment: item.quantity } },
+            }).catch(() => {
+              console.warn(`Produk ${item.product_id} tidak ditemukan saat restock, skip.`);
+            })
+          )
       );
 
       // Hapus transaksi (items terhapus otomatis via CASCADE)

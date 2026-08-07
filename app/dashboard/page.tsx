@@ -5,8 +5,7 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import AppLayout from "@/components/layout/AppLayout";
 import DashboardClient from "./DashboardClient";
-
-const STOCK_PURCHASE_CATEGORY = "Pembelian Stok";
+import { STOCK_PURCHASE_CATEGORY } from "@/lib/constants";
 
 export default async function DashboardPage() {
   const session = await getSession();
