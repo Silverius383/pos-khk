@@ -1,7 +1,7 @@
 // app/transactions/TransactionsClient.tsx
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Product, CartItem, Transaction, DiscountType,
@@ -12,6 +12,7 @@ import { formatDateTime, isExpired } from "@/utils/date";
 import Modal from "@/components/ui/Modal";
 import { SearchIcon, TrashIcon, EditIcon } from "@/components/ui/Icons";
 import { printViaRawBT } from "@/utils/printReceipt";
+import { generateQrisString } from "@/utils/qris";
 
 interface TransactionsClientProps {
   initialProducts: Product[];
@@ -269,7 +270,201 @@ function DiscountModal({
   );
 }
 
-// ── Payment Modal ──────────────────────────────────────────────────────────────
+// ── QRIS Display — QR dinamis dengan nominal ter-inject ───────────────────────
+function QrisDisplay({ totalFinal }: { totalFinal: number }) {
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    setError(false);
+    setQrDataUrl(null);
+
+    const base = process.env.NEXT_PUBLIC_QRIS_BASE_STRING;
+    if (!base) {
+      setError(true);
+      setLoading(false);
+      return;
+    }
+
+    import("qrcode").then((QRCode) => {
+      try {
+        const qrisString = generateQrisString(base, totalFinal);
+        QRCode.toDataURL(qrisString, {
+          errorCorrectionLevel: "M",
+          width: 260,
+          margin: 2,
+        }).then((url) => {
+          setQrDataUrl(url);
+          setLoading(false);
+        }).catch(() => {
+          setError(true);
+          setLoading(false);
+        });
+      } catch {
+        setError(true);
+        setLoading(false);
+      }
+    }).catch(() => {
+      setError(true);
+      setLoading(false);
+    });
+  }, [totalFinal]);
+
+  // Fallback: generate QR dari base string (tanpa nominal) jika inject gagal
+  const FallbackQr = () => {
+    const [fbUrl, setFbUrl] = useState<string | null>(null);
+    useEffect(() => {
+      const base = process.env.NEXT_PUBLIC_QRIS_BASE_STRING;
+      if (!base) return;
+      import("qrcode").then((QRCode) => {
+        QRCode.toDataURL(base, { errorCorrectionLevel: "M", width: 260, margin: 2 })
+          .then(setFbUrl)
+          .catch(() => {});
+      });
+    }, []);
+    if (!fbUrl) return (
+      <div style={{ width: 220, height: 220, display: "flex", alignItems: "center",
+        justifyContent: "center", margin: "0 auto", background: "#EDE9FE", borderRadius: 8 }}>
+        <span style={{ fontSize: 12, color: "#7C3AED" }}>Gagal memuat QR</span>
+      </div>
+    );
+    return <img src={fbUrl} alt="QRIS Statis" style={{ width: 220, height: 220, borderRadius: 8 }} />;
+  };
+
+  return (
+    <div style={{
+      marginTop: "12px", padding: "16px",
+      background: "#F3E8FF", border: "1px solid #C4B5FD",
+      borderRadius: "var(--radius-sm)", textAlign: "center",
+    }}>
+      {/* QR Image */}
+      {loading ? (
+        <div style={{
+          width: 220, height: 220, display: "flex", alignItems: "center",
+          justifyContent: "center", margin: "0 auto", background: "#EDE9FE", borderRadius: 8,
+        }}>
+          <span style={{ fontSize: 13, color: "#7C3AED" }}>Memuat QR...</span>
+        </div>
+      ) : error ? (
+        <FallbackQr />
+      ) : (
+        <img src={qrDataUrl!} alt="QRIS" style={{ width: 220, height: 220, borderRadius: 8 }} />
+      )}
+
+      {/* Nominal */}
+      <div style={{
+        marginTop: "10px", fontSize: "18px", fontWeight: 800,
+        fontFamily: "'JetBrains Mono', monospace", color: "#5B21B6",
+      }}>
+        {formatRupiah(totalFinal)}
+      </div>
+      <div style={{ fontSize: "12px", color: "#7C3AED", marginTop: "4px" }}>
+        Scan QR di atas untuk membayar · {error ? "QR statis (tanpa nominal)" : "Nominal sudah ter-encode"}
+      </div>
+    </div>
+  );
+}
+
+// ── QRIS Display — QR dinamis dengan nominal ter-inject ───────────────────────
+function QrisDisplay({ totalFinal }: { totalFinal: number }) {
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    setError(false);
+    setQrDataUrl(null);
+
+    const base = process.env.NEXT_PUBLIC_QRIS_BASE_STRING;
+    if (!base) {
+      setError(true);
+      setLoading(false);
+      return;
+    }
+
+    import("qrcode").then((QRCode) => {
+      try {
+        const qrisString = generateQrisString(base, totalFinal);
+        QRCode.toDataURL(qrisString, {
+          errorCorrectionLevel: "M",
+          width: 260,
+          margin: 2,
+        }).then((url) => {
+          setQrDataUrl(url);
+          setLoading(false);
+        }).catch(() => {
+          setError(true);
+          setLoading(false);
+        });
+      } catch {
+        setError(true);
+        setLoading(false);
+      }
+    }).catch(() => {
+      setError(true);
+      setLoading(false);
+    });
+  }, [totalFinal]);
+
+  // Fallback: generate QR dari base string (tanpa nominal) jika inject gagal
+  const FallbackQr = () => {
+    const [fbUrl, setFbUrl] = useState<string | null>(null);
+    useEffect(() => {
+      const base = process.env.NEXT_PUBLIC_QRIS_BASE_STRING;
+      if (!base) return;
+      import("qrcode").then((QRCode) => {
+        QRCode.toDataURL(base, { errorCorrectionLevel: "M", width: 260, margin: 2 })
+          .then(setFbUrl)
+          .catch(() => {});
+      });
+    }, []);
+    if (!fbUrl) return (
+      <div style={{ width: 220, height: 220, display: "flex", alignItems: "center",
+        justifyContent: "center", margin: "0 auto", background: "#EDE9FE", borderRadius: 8 }}>
+        <span style={{ fontSize: 12, color: "#7C3AED" }}>Gagal memuat QR</span>
+      </div>
+    );
+    return <img src={fbUrl} alt="QRIS Statis" style={{ width: 220, height: 220, borderRadius: 8 }} />;
+  };
+
+  return (
+    <div style={{
+      marginTop: "12px", padding: "16px",
+      background: "#F3E8FF", border: "1px solid #C4B5FD",
+      borderRadius: "var(--radius-sm)", textAlign: "center",
+    }}>
+      {/* QR Image */}
+      {loading ? (
+        <div style={{
+          width: 220, height: 220, display: "flex", alignItems: "center",
+          justifyContent: "center", margin: "0 auto", background: "#EDE9FE", borderRadius: 8,
+        }}>
+          <span style={{ fontSize: 13, color: "#7C3AED" }}>Memuat QR...</span>
+        </div>
+      ) : error ? (
+        <FallbackQr />
+      ) : (
+        <img src={qrDataUrl!} alt="QRIS" style={{ width: 220, height: 220, borderRadius: 8 }} />
+      )}
+
+      {/* Nominal */}
+      <div style={{
+        marginTop: "10px", fontSize: "18px", fontWeight: 800,
+        fontFamily: "'JetBrains Mono', monospace", color: "#5B21B6",
+      }}>
+        {formatRupiah(totalFinal)}
+      </div>
+      <div style={{ fontSize: "12px", color: "#7C3AED", marginTop: "4px" }}>
+        Scan QR di atas untuk membayar · {error ? "QR statis (tanpa nominal)" : "Nominal sudah ter-encode"}
+      </div>
+    </div>
+  );
+}
+
+// ── Payment Modal (3-step: tipe pembeli → status bayar → metode) ───────────────
 function PaymentModal({
   totalFinal, onConfirm, onClose, processing,
 }: {
@@ -499,9 +694,7 @@ function PaymentModal({
             </div>
           )}
           {selected === "qris" && (
-            <div style={{ marginTop: "10px", padding: "12px 16px", borderRadius: "var(--radius-sm)", background: "#F3E8FF", border: "1px solid #C4B5FD", fontSize: "13px", color: "#7C3AED" }}>
-              📱 Pastikan notifikasi QRIS sudah masuk sebelum konfirmasi.
-            </div>
+            <QrisDisplay totalFinal={totalFinal} />
           )}
         </div>
       )}

@@ -17,44 +17,7 @@ const EMPTY_FORM: ProductFormData = {
   stock: 0, min_stock: 5, expired_date: "",
 };
 
-const CATEGORIES = [
-  "Daging Sapi & Ayam",
-  "Fillet Dori",
-  "French Fries",
-  "Belfoods Nugget",
-  "Champ Nugget",
-  "Fiesta Nugget",
-  "Kanzler Nugget",
-  "So Good Nugget",
-  "Sosis",
-  "Ayam Goreng",
-  "Cordon Bleu, Katsu, Fish & Chips",
-  "Siomay Ayam",
-  "Cedea",
-  "Giziplus",
-  "Indomina",
-  "Minaku",
-  "Pak Den",
-  "Sunfish",
-  "Bakso",
-  "Italian Pizza & Garlic Bread",
-  "Roti Burger, Hot Dog & Isian",
-  "Smoke Beef Ham",
-  "Home Made Olahan Ayam",
-  "Home Made Risoles",
-  "Home Made Jajanan",
-  "Home Made Cireng, Sempol",
-  "Edamame",
-  "Kebab",
-  "Minipao & Donat",
-  "Singkong D9",
-  "Jagung Pipil Manis",
-  "Mixed Vegetables",
-  "Tahu Tofu",
-  "Kulit Dimsum / Lumpia",
-  "Bumbu Tomyum",
-  "Saus & Kecap",
-];
+
 
 interface ProductsClientProps {
   initialProducts: Product[];
@@ -70,31 +33,81 @@ function CategorySelect({
   value: string;
   onChange: (val: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState("");
+  const [open, setOpen]           = useState(false);
+  const [search, setSearch]       = useState("");
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [newCat, setNewCat]       = useState("");
+  const [adding, setAdding]       = useState(false);
+  const [addError, setAddError]   = useState("");
+
+  // Fetch kategori dari API saat mount
+  useEffect(() => {
+    fetch("/api/categories")
+      .then((r) => r.json())
+      .then((d) => { if (d.success) setCategories(d.data); })
+      .catch(() => {});
+  }, []);
 
   const filtered = useMemo(
-    () => CATEGORIES.filter((c) => c.toLowerCase().includes(search.toLowerCase())),
-    [search]
+    () => categories.filter((c) => c.name.toLowerCase().includes(search.toLowerCase())),
+    [categories, search]
   );
 
-  const select = (cat: string) => {
-    onChange(cat);
+  const select = (name: string) => {
+    onChange(name);
     setOpen(false);
     setSearch("");
   };
 
+  const handleAdd = async () => {
+    const name = newCat.trim();
+    if (!name) return;
+    setAdding(true);
+    setAddError("");
+    try {
+      const res  = await fetch("/api/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        setAddError(data.error || "Gagal menambah kategori");
+        return;
+      }
+      setCategories((prev) => [...prev, data.data].sort((a, b) => a.name.localeCompare(b.name)));
+      setNewCat("");
+      onChange(data.data.name); // langsung pilih kategori baru
+    } catch {
+      setAddError("Gagal menambah kategori");
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const handleDelete = async (e: React.MouseEvent, cat: { id: string; name: string }) => {
+    e.stopPropagation();
+    if (!confirm(`Hapus kategori "${cat.name}"?`)) return;
+    try {
+      const res  = await fetch(`/api/categories/${cat.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!data.success) { alert(data.error || "Gagal menghapus"); return; }
+      setCategories((prev) => prev.filter((c) => c.id !== cat.id));
+      if (value === cat.name) onChange("");
+    } catch {
+      alert("Gagal menghapus kategori");
+    }
+  };
+
   return (
     <div>
+      {/* Trigger */}
       <div
         className="form-input"
-        onClick={() => { setOpen((o) => !o); setSearch(""); }}
+        onClick={() => { setOpen((o) => !o); setSearch(""); setAddError(""); }}
         style={{
-          cursor: "pointer",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          userSelect: "none",
+          cursor: "pointer", display: "flex", justifyContent: "space-between",
+          alignItems: "center", userSelect: "none",
           color: value ? "var(--text)" : "var(--text3)",
           borderBottomLeftRadius:  open ? 0 : undefined,
           borderBottomRightRadius: open ? 0 : undefined,
@@ -103,23 +116,19 @@ function CategorySelect({
       >
         <span style={{ fontSize: "14px" }}>{value || "Pilih kategori..."}</span>
         <span style={{
-          fontSize: "10px",
-          color: "var(--text3)",
+          fontSize: "10px", color: "var(--text3)",
           transform: open ? "rotate(180deg)" : "rotate(0deg)",
-          transition: "transform 0.15s",
-          display: "inline-block",
+          transition: "transform 0.15s", display: "inline-block",
         }}>▼</span>
       </div>
 
       {open && (
         <div style={{
-          border: "1.5px solid var(--primary)",
-          borderTop: "none",
+          border: "1.5px solid var(--primary)", borderTop: "none",
           borderRadius: "0 0 var(--radius-sm) var(--radius-sm)",
-          background: "var(--surface)",
-          zIndex: 10,
-          boxShadow: "var(--shadow-md)",
+          background: "var(--surface)", zIndex: 10, boxShadow: "var(--shadow-md)",
         }}>
+          {/* Search */}
           <div style={{ padding: "8px" }}>
             <input
               autoFocus
@@ -131,35 +140,79 @@ function CategorySelect({
               onClick={(e) => e.stopPropagation()}
             />
           </div>
+
+          {/* List */}
           <div style={{ maxHeight: "180px", overflowY: "auto" }}>
             {filtered.length === 0 ? (
-              <div style={{ padding: "10px 14px", color: "var(--text3)", fontSize: "13px" }}>Tidak ditemukan</div>
+              <div style={{ padding: "10px 14px", color: "var(--text3)", fontSize: "13px" }}>
+                {categories.length === 0 ? "Belum ada kategori" : "Tidak ditemukan"}
+              </div>
             ) : (
               filtered.map((cat) => (
                 <div
-                  key={cat}
-                  onClick={() => select(cat)}
+                  key={cat.id}
+                  onClick={() => select(cat.name)}
                   style={{
-                    padding: "9px 14px",
-                    fontSize: "13px",
-                    cursor: "pointer",
-                    background: value === cat ? "var(--primary-light)" : "transparent",
-                    color: value === cat ? "var(--primary)" : "var(--text)",
-                    fontWeight: value === cat ? 600 : 400,
+                    padding: "9px 14px", fontSize: "13px", cursor: "pointer",
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    background: value === cat.name ? "var(--primary-light)" : "transparent",
+                    color: value === cat.name ? "var(--primary)" : "var(--text)",
+                    fontWeight: value === cat.name ? 600 : 400,
                     borderBottom: "1px solid var(--border)",
                     transition: "background 0.1s",
                   }}
                   onMouseEnter={(e) => {
-                    if (value !== cat) (e.currentTarget as HTMLDivElement).style.background = "var(--surface2)";
+                    if (value !== cat.name) (e.currentTarget as HTMLDivElement).style.background = "var(--surface2)";
                   }}
                   onMouseLeave={(e) => {
-                    if (value !== cat) (e.currentTarget as HTMLDivElement).style.background = value === cat ? "var(--primary-light)" : "transparent";
+                    if (value !== cat.name) (e.currentTarget as HTMLDivElement).style.background = "transparent";
                   }}
                 >
-                  {cat}
+                  <span>{cat.name}</span>
+                  <button
+                    onClick={(e) => handleDelete(e, cat)}
+                    title="Hapus kategori"
+                    style={{
+                      background: "none", border: "none", cursor: "pointer",
+                      color: "var(--text3)", fontSize: "14px", padding: "0 2px",
+                      lineHeight: 1, flexShrink: 0,
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = "var(--danger)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text3)")}
+                  >
+                    ×
+                  </button>
                 </div>
               ))
             )}
+          </div>
+
+          {/* Tambah kategori baru */}
+          <div style={{ padding: "8px", borderTop: "1px solid var(--border)" }}>
+            {addError && (
+              <div style={{ fontSize: "12px", color: "var(--danger)", marginBottom: "6px" }}>
+                {addError}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: "6px" }}>
+              <input
+                className="form-input"
+                style={{ fontSize: "13px", padding: "7px 10px", flex: 1 }}
+                placeholder="+ Kategori baru..."
+                value={newCat}
+                onChange={(e) => { setNewCat(e.target.value); setAddError(""); }}
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); handleAdd(); } }}
+              />
+              <button
+                className="btn btn-primary btn-sm"
+                onClick={(e) => { e.stopPropagation(); handleAdd(); }}
+                disabled={adding || !newCat.trim()}
+                style={{ whiteSpace: "nowrap" }}
+              >
+                {adding ? "..." : "Tambah"}
+              </button>
+            </div>
           </div>
         </div>
       )}
