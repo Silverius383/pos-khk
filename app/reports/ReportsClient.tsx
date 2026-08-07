@@ -129,6 +129,17 @@ function LunasModal({
       {selected === "tunai" && (
         <div className="form-group">
           <label className="form-label">Uang Diterima</label>
+          {/* Preset nominal */}
+          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "8px" }}>
+            {[tx.total_amount, ...([10000, 20000, 50000, 100000].filter(a => a > tx.total_amount))].slice(0, 4).map((amt) => (
+              <button key={amt} type="button"
+                className={`tag${cashAmount === amt ? " active" : ""}`}
+                style={{ fontSize: "12px", padding: "4px 10px" }}
+                onClick={() => setCashInput(amt.toLocaleString("id-ID"))}>
+                {amt === tx.total_amount ? "Pas" : formatRupiah(amt)}
+              </button>
+            ))}
+          </div>
           <input className="form-input" inputMode="numeric" placeholder="Masukkan jumlah uang..."
             value={cashInput} onChange={(e) => setCashInput(formatCashInput(e.target.value))}
             style={{ fontSize: "16px", fontWeight: 700 }} />
@@ -491,7 +502,7 @@ export default function ReportsClient({
         setExpenses(data.data.expenses);
       }
     } catch {
-      console.error("Gagal memuat laporan");
+      showToast("Gagal memuat laporan. Coba lagi.", "error");
     } finally {
       setLoading(false);
     }
@@ -635,6 +646,35 @@ export default function ReportsClient({
       {/* Date filter */}
       <div className="card" style={{ marginBottom: "20px" }}>
         <div className="card-body">
+          {/* Preset buttons */}
+          <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px" }}>
+            {(() => {
+              const now   = new Date();
+              const today = now.toISOString().split("T")[0];
+              const startOfWeek = new Date(now); startOfWeek.setDate(now.getDate() - now.getDay() + 1);
+              const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+              const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+              const endOfLastMonth   = new Date(now.getFullYear(), now.getMonth(), 0);
+              const fmt = (d: Date) => d.toISOString().split("T")[0];
+              const presets = [
+                { label: "Hari ini",    from: today,                  to: today },
+                { label: "Minggu ini",  from: fmt(startOfWeek),       to: today },
+                { label: "Bulan ini",   from: fmt(startOfMonth),      to: today },
+                { label: "Bulan lalu",  from: fmt(startOfLastMonth),  to: fmt(endOfLastMonth) },
+              ];
+              return presets.map((p) => (
+                <button
+                  key={p.label}
+                  className={`tag${dateFrom === p.from && dateTo === p.to ? " active" : ""}`}
+                  style={{ fontSize: "12px", padding: "4px 12px" }}
+                  onClick={() => { setDateFrom(p.from); setDateTo(p.to); loadData(p.from, p.to); }}
+                  disabled={loading}
+                >
+                  {p.label}
+                </button>
+              ));
+            })()}
+          </div>
           <div style={{ display: "flex", gap: "12px", alignItems: "flex-end", flexWrap: "wrap" }}>
             <div className="form-group" style={{ margin: 0, flex: 1, minWidth: "140px" }}>
               <label className="form-label">Dari</label>
@@ -795,9 +835,9 @@ export default function ReportsClient({
                 <th>Item</th>
                 <th>Metode</th>
                 <th>Status</th>
-                <th>Diskon</th>
+                <th className="col-hide-mobile">Diskon</th>
                 <th>Total</th>
-                <th>Profit</th>
+                <th className="col-hide-mobile">Profit</th>
                 <th style={{ minWidth: "140px" }}>Aksi</th>
               </tr>
             </thead>
@@ -823,13 +863,13 @@ export default function ReportsClient({
                     }
                   </td>
                   <td><PaymentStatusBadge status={tx.payment_status} /></td>
-                  <td className="td-mono">
+                  <td className="td-mono col-hide-mobile">
                     {tx.total_discount > 0
                       ? <span style={{ color: "var(--warning)" }}>− {formatRupiah(tx.total_discount)}</span>
                       : <span style={{ color: "var(--text3)" }}>—</span>}
                   </td>
                   <td className="td-mono" style={{ fontWeight: 700 }}>{formatRupiah(tx.total_amount)}</td>
-                  <td className="td-mono" style={{ color: tx.payment_status === "pending" ? "var(--text3)" : "var(--success)" }}>
+                  <td className="td-mono col-hide-mobile" style={{ color: tx.payment_status === "pending" ? "var(--text3)" : "var(--success)" }}>
                     {tx.payment_status === "pending" ? "—" : formatRupiah(tx.total_profit)}
                   </td>
                   <td>

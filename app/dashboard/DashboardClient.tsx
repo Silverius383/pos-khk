@@ -241,8 +241,14 @@ export default function DashboardClient({ stats, lowStockProducts, recentTransac
                       placeholder="Cari produk..."
                       value={stockSearch}
                       onChange={(e) => setStockSearch(e.target.value)}
-                      style={{ fontSize: "13px", padding: "7px 10px 7px 34px" }}
+                      style={{ fontSize: "13px", padding: "7px 10px 7px 34px", paddingRight: stockSearch ? "32px" : undefined }}
                     />
+                    {stockSearch && (
+                      <button onClick={() => setStockSearch("")} style={{
+                        position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)",
+                        background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: "16px", lineHeight: 1,
+                      }}>✕</button>
+                    )}
                   </div>
                   {stockCategories.length > 2 && (
                     <div className="filter-bar" style={{ gap: "6px", marginBottom: 0 }}>
@@ -304,16 +310,28 @@ export default function DashboardClient({ stats, lowStockProducts, recentTransac
                   <thead>
                     <tr>
                       <th>Waktu</th>
+                      <th>Pembeli</th>
                       <th>Bayar</th>
+                      <th>Status</th>
                       <th>Total</th>
                       <th></th>
                     </tr>
                   </thead>
                   <tbody>
                     {recentTransactions.map((t) => (
-                      <tr key={t.id}>
+                      <tr key={t.id} style={{ background: t.payment_status === "pending" ? "#FFFBEB" : undefined }}>
                         <td className="text-muted" style={{ fontSize: "12px" }}>{formatDateTime(t.created_at)}</td>
+                        <td style={{ fontSize: "12px" }}>
+                          {t.buyer_name
+                            ? <span style={{ fontWeight: 600 }}>{t.buyer_name}</span>
+                            : <span style={{ color: "var(--text3)" }}>—</span>}
+                        </td>
                         <td><PaymentBadge method={t.payment_method} /></td>
+                        <td>
+                          {t.payment_status === "pending"
+                            ? <span className="badge badge-warning" style={{ fontSize: "10px" }}>🕐 Hutang</span>
+                            : <span className="badge badge-success" style={{ fontSize: "10px" }}>✅ Lunas</span>}
+                        </td>
                         <td className="td-mono" style={{ fontWeight: 700 }}>{formatRupiah(t.total_amount)}</td>
                         <td>
                           <button className="btn btn-ghost btn-sm" onClick={() => setViewTx(t)}>Detail</button>

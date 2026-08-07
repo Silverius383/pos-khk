@@ -66,6 +66,7 @@ export default function RestockClient({ initialProducts }: RestockClientProps) {
         prev.map((p) => p.id === modal.id ? { ...p, stock: data.data.stock } : p)
       );
       setSuccessMsg(`✅ ${modal.name} berhasil ditambah ${qty} stok → total ${data.data.stock}`);
+      setTimeout(() => setSuccessMsg(null), 3500);
       setModal(null);
       router.refresh();
     } catch {
@@ -99,7 +100,13 @@ export default function RestockClient({ initialProducts }: RestockClientProps) {
       <div className="search-wrap">
         <span className="search-icon"><SearchIcon /></span>
         <input className="form-input" placeholder="Cari produk..." value={search}
-          onChange={(e) => setSearch(e.target.value)} />
+          onChange={(e) => setSearch(e.target.value)} style={{ paddingRight: search ? "32px" : undefined }} />
+        {search && (
+          <button onClick={() => setSearch("")} style={{
+            position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)",
+            background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: "16px", lineHeight: 1,
+          }}>✕</button>
+        )}
       </div>
 
       <div className="filter-bar">

@@ -91,11 +91,11 @@ function CategorySelect({
     try {
       const res  = await fetch(`/api/categories/${cat.id}`, { method: "DELETE" });
       const data = await res.json();
-      if (!data.success) { alert(data.error || "Gagal menghapus"); return; }
+      if (!data.success) { setAddError(data.error || "Gagal menghapus"); return; }
       setCategories((prev) => prev.filter((c) => c.id !== cat.id));
       if (value === cat.name) onChange("");
     } catch {
-      alert("Gagal menghapus kategori");
+      setAddError("Gagal menghapus kategori");
     }
   };
 
@@ -232,6 +232,11 @@ export default function ProductsClient({ initialProducts }: ProductsClientProps)
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
+  const showToast = (msg: string, type: "success" | "error" = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3500);
+  };
   const [displayBuyPrice, setDisplayBuyPrice] = useState("");
   const [displaySellPrice, setDisplaySellPrice] = useState("");
 
@@ -344,7 +349,7 @@ export default function ProductsClient({ initialProducts }: ProductsClientProps)
       const data = await res.json();
 
       if (!data.success) {
-        alert(data.error || "Gagal menghapus produk");
+        showToast(data.error || "Gagal menghapus produk", "error");
         return;
       }
 
@@ -352,7 +357,7 @@ export default function ProductsClient({ initialProducts }: ProductsClientProps)
       setModal(null);
       router.refresh();
     } catch {
-      alert("Gagal menghapus produk");
+      showToast("Gagal menghapus produk", "error");
     } finally {
       setSaving(false);
     }
@@ -369,6 +374,20 @@ export default function ProductsClient({ initialProducts }: ProductsClientProps)
 
   return (
     <div>
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: "fixed", bottom: "24px", left: "50%", transform: "translateX(-50%)",
+          zIndex: 2000, padding: "12px 20px", borderRadius: "var(--radius-sm)",
+          background: toast.type === "success" ? "#057A55" : "#C81E1E",
+          color: "#fff", fontSize: "14px", fontWeight: 600,
+          boxShadow: "var(--shadow-lg)", animation: "slideUp 0.2s ease",
+          whiteSpace: "nowrap", maxWidth: "90vw",
+        }}>
+          {toast.msg}
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex-between mb-4">
         <div className="section-title" style={{ margin: 0 }}>
@@ -387,7 +406,14 @@ export default function ProductsClient({ initialProducts }: ProductsClientProps)
           placeholder="Cari produk..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          style={{ paddingRight: search ? "32px" : undefined }}
         />
+        {search && (
+          <button onClick={() => setSearch("")} style={{
+            position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)",
+            background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: "16px", lineHeight: 1,
+          }}>✕</button>
+        )}
       </div>
 
       {/* Category Filter */}
@@ -438,7 +464,11 @@ export default function ProductsClient({ initialProducts }: ProductsClientProps)
                   <td className="td-mono" style={{ fontWeight: 700 }}>
                     {formatRupiah(p.sell_price)}
                   </td>
-                  <td className="td-mono text-success">
+                  <td className={`td-mono ${
+                    calculateMarginPercent(p.sell_price, p.buy_price) >= 15 ? "text-success"
+                    : calculateMarginPercent(p.sell_price, p.buy_price) > 0  ? ""
+                    : "text-danger"
+                  }`}>
                     {calculateMarginPercent(p.sell_price, p.buy_price)}%
                   </td>
                   <td>

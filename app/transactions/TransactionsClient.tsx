@@ -408,6 +408,7 @@ function PaymentModal({
             className={`btn ${payStatus === "paid" ? "btn-success" : "btn-primary"}`}
             onClick={handleConfirm}
             disabled={processing || !isValidCash}
+            onKeyDown={(e) => e.key === "Enter" && !processing && isValidCash && handleConfirm()}
           >
             {processing
               ? "⏳ Memproses..."
@@ -542,6 +543,17 @@ function PaymentModal({
           {selected === "tunai" && (
             <div className="form-group" style={{ marginTop: "12px", marginBottom: 0 }}>
               <label className="form-label">Uang Diterima (opsional)</label>
+              {/* Preset nominal */}
+              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "8px" }}>
+                {[totalFinal, ...[10000, 20000, 50000, 100000].filter(a => a > totalFinal)].slice(0, 4).map((amt) => (
+                  <button key={amt} type="button"
+                    className={`tag${cashAmount === amt ? " active" : ""}`}
+                    style={{ fontSize: "12px", padding: "4px 10px" }}
+                    onClick={() => setCashInput(amt.toLocaleString("id-ID"))}>
+                    {amt === totalFinal ? "Pas" : formatRupiah(amt)}
+                  </button>
+                ))}
+              </div>
               <input
                 className="form-input"
                 inputMode="numeric"
@@ -712,6 +724,11 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
   const [sheetOpen, setSheetOpen]         = useState(false);
   const [lunasModal, setLunasModal]       = useState<Transaction | null>(null);
   const [lunasProcessing, setLunasProcessing] = useState(false);
+  const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
+  const showToast = (msg: string, type: "success" | "error" = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3500);
+  };
 
   // GoSend modal state
   const [goSendModal, setGoSendModal] = useState(false);
@@ -731,6 +748,9 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
     }),
     [products, search, catFilter]
   );
+
+  const availableProducts  = useMemo(() => filtered.filter((p) => p.stock > 0), [filtered]);
+  const outOfStockProducts = useMemo(() => filtered.filter((p) => p.stock <= 0), [filtered]);
 
   const addToCart = (prod: Product) => {
     if (prod.stock <= 0) return;
@@ -873,13 +893,13 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
         body: JSON.stringify({ payment_method: method, cash_received: cashReceived }),
       });
       const data = await res.json();
-      if (!data.success) { alert(data.error || "Gagal update"); return; }
+      if (!data.success) { showToast(data.error || "Gagal update", "error"); return; }
 
       if (receipt && receipt.id === lunasModal.id) setReceipt(data.data);
       setLunasModal(null);
       router.refresh();
     } catch {
-      alert("Gagal menghubungi server");
+      showToast("Gagal menghubungi server", "error");
     } finally {
       setLunasProcessing(false);
     }
@@ -1009,6 +1029,18 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
   return (
     <div>
       {error && <div className="alert alert-danger">{error}</div>}
+      {toast && (
+        <div style={{
+          position: "fixed", bottom: "24px", left: "50%", transform: "translateX(-50%)",
+          zIndex: 2000, padding: "12px 20px", borderRadius: "var(--radius-sm)",
+          background: toast.type === "success" ? "#057A55" : "#C81E1E",
+          color: "#fff", fontSize: "14px", fontWeight: 600,
+          boxShadow: "var(--shadow-lg)", animation: "slideUp 0.2s ease",
+          whiteSpace: "nowrap", maxWidth: "90vw",
+        }}>
+          {toast.msg}
+        </div>
+      )}
 
       {/* ── DESKTOP layout ── */}
       <div className="pos-layout">
@@ -1016,7 +1048,13 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
           <div className="search-wrap">
             <span className="search-icon"><SearchIcon /></span>
             <input className="form-input" placeholder="Cari produk..." value={search}
-              onChange={(e) => setSearch(e.target.value)} />
+              onChange={(e) => setSearch(e.target.value)} style={{ paddingRight: search ? "32px" : undefined }} />
+            {search && (
+              <button onClick={() => setSearch("")} style={{
+                position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)",
+                background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: "16px", lineHeight: 1,
+              }}>✕</button>
+            )}
           </div>
           <div className="filter-bar">
             {categories.map((c) => (
@@ -1025,6 +1063,14 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
             ))}
           </div>
           <div className="product-grid-wrap">
+
+              {/* ── Section: Tersedia ── */}
+              <div style={{
+                fontSize: "12px", fontWeight: 700, color: "var(--text3)",
+                padding: "8px 4px 6px", letterSpacing: "0.05em", textTransform: "uppercase",
+              }}>
+                Tersedia ({availableProducts.length})
+              </div>
             <div className="product-grid">
 
               {/* ── GoSend Tile (virtual) ── */}
@@ -1063,13 +1109,12 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
                 </div>
               </div>
 
-              {/* ── Produk biasa ── */}
-              {filtered.map((p) => {
+              {/* ── Produk tersedia ── */}
+              {availableProducts.map((p) => {
                 const inCart = cart.find((i) => i.product_id === p.id);
-                const isOut  = p.stock <= 0;
                 return (
-                  <div key={p.id} className={`product-tile ${isOut ? "out" : ""}`}
-                    onClick={() => !isOut && addToCart(p)}>
+                  <div key={p.id} className="product-tile"
+                    onClick={() => addToCart(p)}>
                     {isExpired(p.expired_date) && (
                       <div style={{ position: "absolute", top: 6, right: 6 }}>
                         <span className="badge badge-danger" style={{ fontSize: "9px", padding: "2px 6px" }}>Expired</span>
@@ -1088,17 +1133,52 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
                     <div className="product-tile-cat">{p.category || "Umum"}</div>
                     <div className="product-tile-name">{p.name}</div>
                     <div className="product-tile-price">{formatRupiah(p.sell_price)}</div>
-                    <div className="product-tile-stock">{isOut ? "Habis" : `Stok: ${p.stock}`}</div>
+                    <div className="product-tile-stock">Stok: {p.stock}</div>
                   </div>
                 );
               })}
+
+              {availableProducts.length === 0 && (
+                <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "24px", color: "var(--text3)" }}>
+                  Tidak ada produk tersedia
+                </div>
+              )}
+            </div>
+
+              {/* ── Section: Habis — hanya tampil jika ada ── */}
+              {outOfStockProducts.length > 0 && (
+                <>
+                  <div style={{
+                    fontSize: "12px", fontWeight: 700, color: "var(--text3)",
+                    padding: "16px 4px 6px", letterSpacing: "0.05em", textTransform: "uppercase",
+                    borderTop: "1px solid var(--border)", marginTop: "8px",
+                  }}>
+                    Habis ({outOfStockProducts.length})
+                  </div>
+                  <div className="product-grid">
+                    {outOfStockProducts.map((p) => (
+                      <div key={p.id} className="product-tile out">
+                        {isExpired(p.expired_date) && (
+                          <div style={{ position: "absolute", top: 6, right: 6 }}>
+                            <span className="badge badge-danger" style={{ fontSize: "9px", padding: "2px 6px" }}>Expired</span>
+                          </div>
+                        )}
+                        <div className="product-tile-cat">{p.category || "Umum"}</div>
+                        <div className="product-tile-name">{p.name}</div>
+                        <div className="product-tile-price">{formatRupiah(p.sell_price)}</div>
+                        <div className="product-tile-stock">Habis</div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+
               {filtered.length === 0 && (
-                <div style={{ gridColumn: "1/-1", textAlign: "center", padding: "40px", color: "var(--text3)" }}>
+                <div style={{ textAlign: "center", padding: "40px", color: "var(--text3)" }}>
                   Produk tidak ditemukan
                 </div>
               )}
             </div>
-          </div>
         </div>
 
         {/* Desktop cart panel */}
@@ -1180,7 +1260,7 @@ export default function TransactionsClient({ initialProducts }: TransactionsClie
                 </button>
               )}
               <button className="btn btn-ghost" onClick={() => printViaRawBT(receipt)}>🖨️ Cetak Struk</button>
-              <button className="btn btn-primary" onClick={() => setReceipt(null)}>Selesai</button>
+              <button className="btn btn-primary" onClick={() => setReceipt(null)}>✅ Transaksi Baru</button>
             </div>
           }
         >

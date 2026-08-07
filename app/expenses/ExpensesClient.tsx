@@ -24,6 +24,12 @@ export default function ExpensesClient({ initialExpenses }: ExpensesClientProps)
   const [displayAmount, setDisplayAmount] = useState(""); // 👈 formatted display value
   const [saving, setSaving]       = useState(false);
   const [error, setError]         = useState("");
+  const [loadingExpenses, setLoadingExpenses] = useState(false);
+  const [toast, setToast]         = useState<{ msg: string; type: "success" | "error" } | null>(null);
+  const showToast = (msg: string, type: "success" | "error" = "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3500);
+  };
 
   // ── Rupiah input handler ──────────────────────────────────────────────
   const handleAmountChange = (value: string) => {
@@ -34,12 +40,15 @@ export default function ExpensesClient({ initialExpenses }: ExpensesClientProps)
   };
 
   const loadExpenses = async (month: string) => {
+    setLoadingExpenses(true);
     try {
       const res  = await fetch(`/api/expenses?month=${month}`);
       const data = await res.json();
       if (data.success) setExpenses(data.data);
     } catch {
-      console.error("Gagal memuat data");
+      showToast("Gagal memuat data pengeluaran", "error");
+    } finally {
+      setLoadingExpenses(false);
     }
   };
 
@@ -109,7 +118,7 @@ export default function ExpensesClient({ initialExpenses }: ExpensesClientProps)
       const data = await res.json();
 
       if (!data.success) {
-        alert("Gagal menghapus data");
+        showToast("Gagal menghapus data", "error");
         return;
       }
 
@@ -117,7 +126,7 @@ export default function ExpensesClient({ initialExpenses }: ExpensesClientProps)
       setDeleteId(null);
       router.refresh();
     } catch {
-      alert("Gagal menghapus data");
+      showToast("Gagal menghapus data", "error");
     } finally {
       setSaving(false);
     }
@@ -132,6 +141,20 @@ export default function ExpensesClient({ initialExpenses }: ExpensesClientProps)
 
   return (
     <div>
+      {/* Toast */}
+      {toast && (
+        <div style={{
+          position: "fixed", bottom: "24px", left: "50%", transform: "translateX(-50%)",
+          zIndex: 2000, padding: "12px 20px", borderRadius: "var(--radius-sm)",
+          background: toast.type === "success" ? "#057A55" : "#C81E1E",
+          color: "#fff", fontSize: "14px", fontWeight: 600,
+          boxShadow: "var(--shadow-lg)", animation: "slideUp 0.2s ease",
+          whiteSpace: "nowrap", maxWidth: "90vw",
+        }}>
+          {toast.msg}
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex-between mb-4">
         <div className="section-title" style={{ margin: 0 }}>
@@ -145,6 +168,16 @@ export default function ExpensesClient({ initialExpenses }: ExpensesClientProps)
       {/* Month filter */}
       <div className="filter-bar mb-6">
         <label className="form-label" style={{ margin: 0 }}>Filter Bulan:</label>
+        <button
+          className="btn btn-ghost btn-sm"
+          onClick={() => {
+            const [y, m] = filterMonth.split("-").map(Number);
+            const prev = new Date(y, m - 2, 1);
+            const val  = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, "0")}`;
+            handleMonthChange(val);
+          }}
+          title="Bulan sebelumnya"
+        >←</button>
         <input
           type="month"
           className="form-input"
@@ -152,6 +185,17 @@ export default function ExpensesClient({ initialExpenses }: ExpensesClientProps)
           value={filterMonth}
           onChange={(e) => handleMonthChange(e.target.value)}
         />
+        <button
+          className="btn btn-ghost btn-sm"
+          onClick={() => {
+            const [y, m] = filterMonth.split("-").map(Number);
+            const next = new Date(y, m, 1);
+            const val  = `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
+            handleMonthChange(val);
+          }}
+          title="Bulan berikutnya"
+          disabled={filterMonth >= new Date().toISOString().slice(0, 7)}
+        >→</button>
         <span className="text-muted">{monthLabel(filterMonth)}</span>
       </div>
 
@@ -201,7 +245,12 @@ export default function ExpensesClient({ initialExpenses }: ExpensesClientProps)
       )}
 
       {/* Expense list */}
-      <div className="card">
+      <div className="card" style={{ opacity: loadingExpenses ? 0.6 : 1, transition: "opacity 0.2s" }}>
+        {loadingExpenses && (
+          <div style={{ textAlign: "center", padding: "8px", fontSize: "13px", color: "var(--text3)" }}>
+            ⏳ Memuat data...
+          </div>
+        )}
         <div className="table-wrap">
           <table>
             <thead>

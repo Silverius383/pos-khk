@@ -313,6 +313,20 @@ html, body {
 .btn-lg { padding: 14px 24px; font-size: 16px; font-weight: 700; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+/* Focus ring untuk keyboard navigation */
+.btn:focus-visible,
+.btn-icon:focus-visible,
+.tag:focus-visible,
+.qty-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Hapus spinner arrow di input number */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"] { -moz-appearance: textfield; }
+
 .btn-icon {
   padding: 8px;
   border-radius: var(--radius-sm);
@@ -425,6 +439,11 @@ tbody tr:hover { background: var(--bg); }
   box-shadow: 0 1px 0 var(--border);
 }
 
+/* Sembunyikan kolom kurang penting di mobile */
+@media (max-width: 768px) {
+  .report-table-wrap .col-hide-mobile { display: none; }
+}
+
 .products-table-wrap thead th {
   position: sticky;
   top: 0;
@@ -487,6 +506,7 @@ tbody tr:hover { background: var(--bg); }
   width: 100%;
   max-width: 520px;
   max-height: 90vh;
+  max-height: 90dvh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -497,6 +517,8 @@ tbody tr:hover { background: var(--bg); }
   padding: 24px;
   overflow-y: auto;
   flex: 1;
+  max-height: calc(90vh - 130px);
+  max-height: calc(90dvh - 130px);
 }
 
 .modal-lg { max-width: 700px; }
