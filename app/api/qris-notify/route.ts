@@ -2,11 +2,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
-const QRIS_KEYWORD = "menerima pembayaran qris";
-
-// ── POST: Terima webhook dari MacroDroid ──────────────────────────────────────
+// ── POST: Terima webhook dari MacroDroid / PayHook / app lainnya ──────────────
 export async function POST(request: NextRequest) {
-  // Terima secret dari header ATAU URL query param (MacroDroid compatibility)
+  // Terima secret dari header ATAU URL query param
   const headerSecret = request.headers.get("x-secret");
   const urlSecret    = new URL(request.url).searchParams.get("secret");
   const secret       = headerSecret || urlSecret;
@@ -15,22 +13,21 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const body = await request.json();
-    const text: string = (body.text || "").toLowerCase();
+    const body = await request.json().catch(() => ({}));
 
-    // Validasi isi notif mengandung kata kunci QRIS BCA
-    if (!text.includes(QRIS_KEYWORD)) {
-      return NextResponse.json({ success: false, error: "Bukan notifikasi QRIS" }, { status: 400 });
-    }
+    // Ekstrak teks dari berbagai format payload (MacroDroid, PayHook, dll)
+    const rawText =
+      body.text ||           // MacroDroid format: { text: "..." }
+      body.message ||        // PayHook format: { message: "..." }
+      body.content ||        // format lain
+      body.body ||
+      JSON.stringify(body);  // fallback: simpan seluruh payload sebagai string
 
-    // Simpan event baru + cleanup event lama > 1 jam sekaligus
+    // Cleanup event lama > 1 jam + simpan event baru
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
     await Promise.all([
       prisma.qrisEvent.create({
-        data: {
-          raw_text: body.text,
-          consumed: false,
-        },
+        data: { raw_text: String(rawText), consumed: false },
       }),
       prisma.qrisEvent.deleteMany({
         where: { received_at: { lt: oneHourAgo } },
@@ -49,10 +46,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const afterParam = searchParams.get("after");
-
-    // after = ISO timestamp kapan QrisDisplay mulai ditampilkan
-    // Cegah event lama dari transaksi sebelumnya terdeteksi
-    const afterDate = afterParam ? new Date(afterParam) : new Date(0);
+    const afterDate  = afterParam ? new Date(afterParam) : new Date(0);
 
     const event = await prisma.qrisEvent.findFirst({
       where: {
@@ -66,7 +60,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ found: false });
     }
 
-    // Tandai sebagai consumed agar tidak terdeteksi dua kali
     await prisma.qrisEvent.update({
       where: { id: event.id },
       data:  { consumed: true },
