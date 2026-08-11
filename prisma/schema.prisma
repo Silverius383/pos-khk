@@ -102,3 +102,14 @@ model Category {
 
   @@map("categories")
 }
+
+model QrisEvent {
+  id          String   @id @default(uuid())
+  received_at DateTime @default(now())
+  raw_text    String
+  consumed    Boolean  @default(false)
+
+  @@index([consumed])
+  @@index([received_at])
+  @@map("qris_events")
+}

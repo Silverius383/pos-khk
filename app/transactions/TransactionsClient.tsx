@@ -264,7 +264,11 @@ function QrisDisplay({ totalFinal }: { totalFinal: number }) {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(false);
+  const [qrisPaid, setQrisPaid]   = useState(false);
+  // Catat waktu QrisDisplay pertama kali mount — untuk filter event lama
+  const pollStartTime = useState(() => new Date().toISOString())[0];
 
+  // Generate QR
   useEffect(() => {
     setLoading(true);
     setError(false);
@@ -301,6 +305,22 @@ function QrisDisplay({ totalFinal }: { totalFinal: number }) {
     });
   }, [totalFinal]);
 
+  // Polling notifikasi QRIS dari server setiap 3 detik
+  useEffect(() => {
+    if (qrisPaid) return;
+    const interval = setInterval(async () => {
+      try {
+        const res  = await fetch(`/api/qris-notify?after=${encodeURIComponent(pollStartTime)}`);
+        const data = await res.json();
+        if (data.found) {
+          setQrisPaid(true);
+          clearInterval(interval);
+        }
+      } catch { /* silent fail, coba lagi 3 detik */ }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [qrisPaid, pollStartTime]);
+
   // Fallback: generate QR dari base string (tanpa nominal) jika inject gagal
   const FallbackQr = () => {
     const [fbUrl, setFbUrl] = useState<string | null>(null);
@@ -325,9 +345,26 @@ function QrisDisplay({ totalFinal }: { totalFinal: number }) {
   return (
     <div style={{
       marginTop: "12px", padding: "16px",
-      background: "#F3E8FF", border: "1px solid #C4B5FD",
+      background: qrisPaid ? "#F0FDF4" : "#F3E8FF",
+      border: `1px solid ${qrisPaid ? "#86EFAC" : "#C4B5FD"}`,
       borderRadius: "var(--radius-sm)", textAlign: "center",
+      transition: "all 0.3s ease",
     }}>
+      {/* Banner sukses pembayaran */}
+      {qrisPaid && (
+        <div style={{
+          marginBottom: "12px", padding: "12px 16px",
+          background: "#22C55E", borderRadius: "8px",
+          color: "#fff", fontWeight: 700, fontSize: "15px",
+          animation: "slideUp 0.3s ease",
+        }}>
+          ✅ Pembayaran QRIS Diterima!<br />
+          <span style={{ fontSize: "12px", fontWeight: 400, opacity: 0.9 }}>
+            Silakan klik Konfirmasi &amp; Lunas
+          </span>
+        </div>
+      )}
+
       {/* QR Image */}
       {loading ? (
         <div style={{
@@ -345,12 +382,15 @@ function QrisDisplay({ totalFinal }: { totalFinal: number }) {
       {/* Nominal */}
       <div style={{
         marginTop: "10px", fontSize: "18px", fontWeight: 800,
-        fontFamily: "'JetBrains Mono', monospace", color: "#5B21B6",
+        fontFamily: "'JetBrains Mono', monospace",
+        color: qrisPaid ? "#16A34A" : "#5B21B6",
       }}>
         {formatRupiah(totalFinal)}
       </div>
-      <div style={{ fontSize: "12px", color: "#7C3AED", marginTop: "4px" }}>
-        Scan QR di atas untuk membayar · {error ? "QR statis (tanpa nominal)" : "Nominal sudah ter-encode"}
+      <div style={{ fontSize: "12px", color: qrisPaid ? "#16A34A" : "#7C3AED", marginTop: "4px" }}>
+        {qrisPaid
+          ? "✅ Pembayaran sudah masuk"
+          : `Scan QR di atas untuk membayar · ${error ? "QR statis (tanpa nominal)" : "Nominal sudah ter-encode"}`}
       </div>
     </div>
   );
