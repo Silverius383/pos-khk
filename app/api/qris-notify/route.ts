@@ -6,7 +6,10 @@ const QRIS_KEYWORD = "menerima pembayaran qris";
 
 // ── POST: Terima webhook dari MacroDroid ──────────────────────────────────────
 export async function POST(request: NextRequest) {
-  const secret = request.headers.get("x-secret");
+  // Terima secret dari header ATAU URL query param (MacroDroid compatibility)
+  const headerSecret = request.headers.get("x-secret");
+  const urlSecret    = new URL(request.url).searchParams.get("secret");
+  const secret       = headerSecret || urlSecret;
   if (!secret || secret !== process.env.QRIS_NOTIFY_SECRET) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
